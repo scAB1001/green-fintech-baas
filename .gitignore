@@ -54,3 +54,4 @@ LICENSE
 instance/
 *.db
 *.sqlite3
+git.sh
