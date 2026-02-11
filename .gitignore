@@ -1,12 +1,28 @@
 # .gitignore
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
+.venv
+venv/
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Poetry
+poetry.lock
+*.egg-info/
 dist/
+build/
+
+develop-eggs/
 downloads/
 eggs/
 .eggs/
@@ -19,16 +35,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-.pytest_cache/
-.cache
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.log
-.env
-.venv
-venv/
 ENV/
 env/
 .vscode/
@@ -37,11 +43,14 @@ env/
 *.swo
 *~
 .DS_Store
+*.pot
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# Project specific
+LICENSE
+instance/
 *.db
 *.sqlite3
-instance/
-*.log
-*.pot
-docker-compose.override.yml
-# Docker
-docker-compose.override.yml
