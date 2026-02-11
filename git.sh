@@ -2,5 +2,5 @@
 #!/bin/bash
 
 cd green-fintech-baas/
-git status
-git add .; git commit; git push origin main
+git status; sleep 3s
+git add .; git commit; git push origin develop
