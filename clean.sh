@@ -7,7 +7,7 @@ SKIP=black,reorder-python-imports,double-quote-string-fixer poetry run pre-commi
 poetry run pre-commit autoupdate
 
 # Run on all files
-poetry run pre-commit run --all-files
+poetry run pre-commit run --all-files --verbose
 
 # Fix individually
 poetry run black src/ tests/
