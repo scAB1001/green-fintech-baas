@@ -1,4 +1,3 @@
-#git.sh
 #!/bin/bash
 
 cd green-fintech-baas/

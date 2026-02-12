@@ -1,0 +1,180 @@
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0  # Use the sha / tag you want to point at (use latest)
+    hooks:
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+        description: This hook trims trailing whitespace.
+      - id: end-of-file-fixer
+        name: Fix EOF Formatting with Newline
+        description: This hook ensures files end in a newline and only a newline.
+      - id: double-quote-string-fixer
+        name: Fix Double Quoted Strings to Single
+        description: This hook replaces double quoted strings with single quoted strings.
+      - id: name-tests-test
+        name: Verify Test File Naming
+        description: This hook verifies that test files are named correctly.
+      - id: check-added-large-files
+        name: Check For Giant File
+        description: This hook prevents giant files from being committed.
+      - id: debug-statements
+        name: Check for Debugger Imports and calls to breakpoint()
+        description: This hook checks for debugger imports and py37+ breakpoint() calls in python source.
+      - id: check-ast
+        name: Check File Parses to Valid Python
+        description: This hook checks whether files parse as valid python.
+      - id: check-executables-have-shebangs
+        name: Check Non-binary .exe for Shebang
+        description: This hook checks that non-binary executables have a proper shebang.
+      - id: check-shebang-scripts-are-executable
+        name: Check Non-binary .exe is Executable
+        description: This hook checks that non-binary executables are executable.
+      - id: check-yaml
+        name: Check Valid YAML File
+        description: This hook validates YAML files.
+      - id: check-toml
+        name: Check TOML Syntax
+        description: This hook attempts to load all TOML files to verify syntax.
+      - id: check-json
+        name: Check JSON Syntax
+        description: This hook attempts to load all json files to verify syntax.
+      - id: pretty-format-json
+        name: Pretty Format JSON
+        description: This hook checks that all your JSON files are pretty. "Pretty" here means that keys are sorted and indented.
+        args: [--autofix, --no-ensure-ascii, --no-sort-keys]
+      - id: detect-private-key
+        name: Check for Private Key
+        description: This hook checks for the existence of private keys.
+
+  - repo: https://github.com/asottile/reorder-python-imports
+    rev: v3.16.0
+    hooks:
+      - id: reorder-python-imports
+        name: Reorder Python Import
+        description: This hook reorders python imports.
+        exclude: ^pre_commit/resources/
+        args: [--py312-plus, --add-import, 'from __future__ import annotations']
+
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v4.0.0
+    hooks:
+      - id: add-trailing-comma
+        name: Add Trailing Commas
+        description: This hook adds trailing commas to calls and literals.
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.21.2
+    hooks:
+      - id: pyupgrade
+        name: Upgrade Syntax for Newer Version
+        description: This hook upgrades syntax for newer versions.
+        types: [python]
+        args: [--py312-plus]
+
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.3.2
+    hooks:
+      - id: autopep8
+        name: Formats Python Code to PEP 8 Style
+        description: This hook formats Python code to conform to the PEP 8 style guide.
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        name: Add Command-line Python-style Utility
+        description: This hook adds command-line utility for enforcing style consistency across Python projects.
+
+  - repo: https://github.com/psf/black
+    rev: 26.1.0  # Updated to latest
+    hooks:
+      - id: black
+        name: black Python Formatting
+        description: This hook formats python code.
+        types_or: [python, pyi]
+        args: [--line-length=88]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0  # Updated to latest
+    hooks:
+      - id: ruff-check  # TODO: This replaces black
+        name: Ruff Python Linting
+        description: This hook runs "ruff check" for extremely fast Python linting.
+        types_or: [python, pyi]
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: Ruff Python Formatting
+        description: This hook runs "ruff format" for extremely fast Python formatting.
+        types_or: [python, pyi]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 7.0.0
+    hooks:
+      - id: isort
+        name: isort Python Import
+        description: This hook uses isort to sort python imports.
+        require_serial: true
+        types_or: [cython, pyi, python]
+        args: [--profile, black, --filter-files]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1  # Updated to latest
+    hooks:
+      - id: mypy
+        name: mypy mirror for Python Static Type Checking
+        description: This hook calls the mirror of mypy, the static type checker for Python.
+        additional_dependencies:
+          - "tokenize-rt==3.2.0"
+          - "pydantic>=2.0.0"
+          - "fastapi>=0.115.0"
+          - "sqlalchemy>=2.0.0"
+          - "types-python-dateutil"
+          - "types-PyYAML"
+        args: [
+          --strict,
+          --ignore-missing-imports,
+          --scripts-are-modules,
+          # --disallow-untyped-defs=true,  # TODO: Set to true later
+          --check-untyped-defs,
+          --warn-redundant-casts,
+          --warn-unused-ignores,
+          --warn-no-return,
+          --no-implicit-optional
+        ]
+        require_serial: true
+        exclude: ^tests/|^alembic/
+
+  - repo: https://github.com/python-poetry/poetry
+    rev: 2.3.2  # Updated to latest
+    hooks:
+      - id: poetry-check
+        name: Check Poetry Config
+        description: This hook runs "poetry check" to validate config.
+        files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
+      - id: poetry-lock
+        name: Update Lock File
+        description: This hook runs "poetry lock" to update the lock file.
+        files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
+      - id: poetry-install
+        name: Install Lock File Dependencies
+        description: This hook runs "poetry install" to install dependencies from the lock file.
+        stages: [post-checkout, post-merge]
+        always_run: true
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.10  # Updated to latest
+    hooks:
+      - id: actionlint
+        name: Check Syntax for Workflow File
+        description: This hooks checks the syntax for workflow files.
+        args: [
+          -ignore=property "debug_build" is not defined,
+          -ignore=property "allow_failure" is not defined,
+          -ignore=SC2(046|086),
+        ]
+        additional_dependencies:
+          # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
+          # and checks these with shellcheck. This is arguably its most useful feature,
+          # but the integration only works if shellcheck is installed
+          - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"
