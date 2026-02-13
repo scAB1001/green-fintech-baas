@@ -51,3 +51,7 @@ poetry add python-dotenv black isort ruff mypy pre-commit twine --group dev
 poetry add pytest pytest-cov pytest-asyncio --group test
 poetry add uvicorn --group prod
 poetry add sphinx --group docs
+
+# Testing FastAPI Python App
+poetry run pytest -v
+poetry run uvicorn app.main:app --reload

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pytest  # Add this import
+import pytest
 
 
 def test_import():
