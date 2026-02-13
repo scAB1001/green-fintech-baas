@@ -13,6 +13,5 @@ git diff; sleep 2s
 git add .
 
 git commit
-# SKIP=black,reorder-python-imports,double-quote-string-fixer git commit
 
 git push origin chore/setup-python-poetry

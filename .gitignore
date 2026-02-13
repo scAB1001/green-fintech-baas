@@ -55,3 +55,4 @@ instance/
 *.db
 *.sqlite3
 git.sh
+clean.sh
