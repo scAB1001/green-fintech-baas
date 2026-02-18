@@ -67,6 +67,8 @@ poetry run twine upload --repository testpypi dist/* --username __token__ --pass
 # Testing FastAPI Python App
 poetry run pytest -v
 poetry run uvicorn app.main:app --reload
+# Go to /docs to see auto-generated API docs
+# Go to /
 
 
 ###                 ###
@@ -81,20 +83,28 @@ docker ps -a | grep green-fintech
 # Start PostgreSQL only (no app container)
 docker compose up -d postgres
 
-# Check status of PostgreSQL
-./scripts/db-helper.sh status
+# Use pgpass Feature Branch 1.4: PostgreSQL with Docker
 
-# Connect to psql with interactive terminal
-./scripts/db-helper.sh psql
+# Start PostgreSQL (automatically creates .pgpass)
+./scripts/db-helper.sh start
 
-# Check current PostgreSQL settings
-docker exec green-fintech-db psql -U postgres -d green_fintech -c "SHOW ALL;" | grep -E "shared_buffers|work_mem|max_connections"
+# Show configuration (now works with .pgpass)
+./scripts/db-helper.sh config
 
-# Check database size
-docker exec green-fintech-db psql -U postgres -d green_fintech -c "SELECT pg_database_size('green_fintech')/1024/1024 as size_mb;"
+# Check connections
+./scripts/db-helper.sh connections
 
-# Check active connections
-docker exec green-fintech-db psql -U postgres -d green_fintech -c "SELECT count(*) FROM pg_stat_activity;"
+# View database stats
+./scripts/db-helper.sh stats
 
-# Check table sizes
-docker exec green-fintech-db psql -U postgres -d green_fintech -c "SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC;"
+# See table sizes
+./scripts/db-helper.sh tables
+
+# Run custom query
+./scripts/db-helper.sh sql "SELECT 'Hello' as greeting;"
+
+# Test all access methods
+./scripts/db-helper.sh test-access
+
+# When done, .pgpass is automatically cleaned up
+./scripts/db-helper.sh stop

@@ -49,13 +49,7 @@ load_env() {
             fi
         done < .env
 
-        # Display loaded configuration (hide password)
         success Loaded environment variables from .env:
-        data "POSTGRES_USER: ${POSTGRES_USER}"
-        data "POSTGRES_DB: ${POSTGRES_DB}"
-        data "POSTGRES_PORT: ${POSTGRES_PORT}"
-        data "POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS}"
-        data "POSTGRES_PASSWORD: [HIDDEN]"
     else
         warn "No .env file found, using defaults"
         # Default values if no .env
@@ -65,6 +59,16 @@ load_env() {
         export POSTGRES_PORT=5432
         export POSTGRES_INITDB_ARGS="--auth=scram-sha-256"
     fi
+}
+
+# Display loaded configuration (hide password)
+show_env() {
+    info "Current Environment Configuration:"
+    data "User: ${POSTGRES_USER}"
+    data "Database: ${POSTGRES_DB}"
+    data "Port: ${POSTGRES_PORT}"
+    data "Init Args: ${POSTGRES_INITDB_ARGS}"
+    data "DATABASE_URL: ${DATABASE_URL/postgres:$POSTGRES_PASSWORD@/postgres:[HIDDEN]@}"
 }
 
 # Set DATABASE_URL for applications (using asyncpg driver)
@@ -237,14 +241,9 @@ restore() {
     fi
 }
 
+# Show current configuration and runtime settings
 show_config() {
-    echo
-    info "Current PostgreSQL Configuration:"
-    data "User: ${POSTGRES_USER}"
-    data "Database: ${POSTGRES_DB}"
-    data "Port: ${POSTGRES_PORT}"
-    data "Init Args: ${POSTGRES_INITDB_ARGS}"
-    data "DATABASE_URL: ${DATABASE_URL/postgres:$POSTGRES_PASSWORD@/postgres:[HIDDEN]@}"
+    show_env
 
     if check_postgres >/dev/null 2>&1; then
         echo
@@ -329,6 +328,34 @@ table_sizes() {
     ORDER BY pg_total_relation_size(relid) DESC;"
 }
 
+# Test all access methods
+test_access() {
+    info "Testing PostgreSQL access methods:"
+
+    # Method 1: PGPASSFILE
+    echo -n "  Method 1 (PGPASSFILE): "
+    if docker exec -e PGPASSFILE=/tmp/.pgpass green-fintech-db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
+        success "Success"
+    else
+        error "Failed"
+    fi
+
+    # Method 2: PGPASSWORD
+    echo -n "  Method 2 (PGPASSWORD): "
+    if docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" green-fintech-db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
+        success "Success"
+    else
+        error "Failed"
+    fi
+
+    # Method 3: Connection string
+    echo -n "  Method 3 (URI): "
+    if docker exec green-fintech-db psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
+        success "Success"
+    else
+        error "Failed"
+    fi
+}
 
 # Main script execution
 main() {
@@ -345,19 +372,20 @@ main() {
         start) start ;;
         stop) stop ;;
         restart) stop; sleep 2; start ;;
-        status) check_postgres ;;
+        st|status) check_postgres ;;
         reset) reset ;;
         psql) psql ;;
         logs) logs ;;
         backup) backup ;;
         restore) restore "$2" ;;
-        config) show_config ;;
+        cn|config) show_config ;;
         connections) active_connections ;;
         stats) db_stats ;;
         tables) table_sizes ;;
         sql) run_sql "$2" ;;
+        test-access) test_access ;;
         *)
-            echo "Usage: $0 {start|stop|restart|status|reset|psql|logs|backup|restore|config|connections|stats|tables|sql}"
+            echo "Usage: $0 {start|stop|restart|status|reset|psql|logs|backup|restore|config|connections|stats|tables|sql|test-access}"
             echo
             echo "Commands:"
             info "start        - Start PostgreSQL with SCRAM-SHA-256 auth"
@@ -374,6 +402,7 @@ main() {
             info "stats        - Show database statistics"
             info "tables       - Show table sizes"
             info "sql 'query'  - Run a SQL query"
+            info "test-access  - Test all access methods"
             exit 1
             ;;
     esac
