@@ -1,0 +1,58 @@
+services:
+  postgres:
+    # Using the official PostgreSQL 18 Alpine image
+    image: postgres:18-alpine
+    container_name: green-fintech-db
+    environment:
+      # Required: Set a password for the postgres user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Optional: Create a custom database (defaults to POSTGRES_USER)
+      POSTGRES_DB: ${POSTGRES_DB:-green_fintech}
+      # Optional: Set a custom user (defaults to 'postgres')
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # Optional: Additional authentication method (defaults to scram-sha-256)
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth=scram-sha-256}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persist database data
+      - postgres_data:/var/lib/postgresql/data
+      # Custom initialization scripts (optional)
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
+      # Custom configuration (optional)
+      - ./scripts/postgresql.custom.conf:/etc/postgresql/postgresql.conf:ro
+      # - ./scripts/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-green_fintech}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - green-fintech-network
+    restart: unless-stopped
+
+  # Your FastAPI app (to be added later)
+  # api:
+  #   build: .
+  #   container_name: green-fintech-api
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-green_fintech}
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./src:/app/src
+  #   networks:
+  #     - green-fintech-network
+
+networks:
+  green-fintech-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
