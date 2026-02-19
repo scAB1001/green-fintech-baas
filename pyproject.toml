@@ -23,16 +23,42 @@ license = "MIT"
 keywords = ["fintech", "esg", "api", "fastapi"]
 
 dependencies = [
+    # FastAPI web framework for building the API
     "fastapi==0.129.0",
+
+    # HTTP client for making requests to external services (e.g., ESG data providers)
     "httpx>=0.28.1",
+
+    # Pydantic for data validation and settings management
     "pydantic>=2.12.5",
+
+    # Pydantic Settings for managing application configuration
     "pydantic-settings>=2.12.0",
+
+    # SQLAlchemy for database interactions (asyncio support for async operations)
     "sqlalchemy[asyncio] (>=2.0.0)",
+
+    # Asyncpg for PostgreSQL database driver (async support)
     "asyncpg (>=0.31.0,<0.32.0)",
-    "psycopg[binary] (>=3.3.2,<4.0.0)"
-    # SQLAlchemy
-    # Alembic
-    # Redis
+
+
+    # Psycopg for PostgreSQL database driver (sync support)
+    "psycopg[binary] (>=3.3.2,<4.0.0)",
+
+    # Alembic for database migrations
+    "alembic (>=1.18.4,<2.0.0)",
+
+    # psycopg2-binary for PostgreSQL database driver (sync support, alternative to psycopg) (needed for Alembic to work with PostgreSQL)
+    "psycopg2-binary (>=2.9.11,<3.0.0)"
+
+    # TODO: Decide which drivers are needed.
+    # Psycopg is the new generation PostgreSQL driver for Python, designed to be faster and more efficient than psycopg2.
+    # It supports both sync and async operations, but asyncpg is specifically optimized for async use cases.
+    # If you are using SQLAlchemy with asyncio, asyncpg is the recommended driver.
+    # However, if you need to support both sync and async operations, you might want to include both drivers.
+    # Alembic, for example, may require a sync driver like psycopg2 for certain operations.
+
+    # TODO: Redis
 ]
 
 [project.urls]
@@ -88,7 +114,8 @@ ignore = []
 known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["ARG", "B", "F401"]
+"tests/**/*.py" = ["ARG", "B", "F401"]  # Ignore unused argument and import errors in tests
+"alembic/versions/*.py" = ["E501"]  # Ignore line length in migrations
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

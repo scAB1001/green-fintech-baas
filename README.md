@@ -13,10 +13,10 @@ A sophisticated Banking-as-a-Service (BaaS) simulation platform for green financ
 
 ## 📋 Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - Poetry
-- Docker & Docker Compose
-- PostgreSQL 16+ (or Docker)
+- Docker version 29.2.1, build a5c7197 & Docker Compose v5.0.2
+- PostgreSQL 18+ (or Docker)
 - Redis 7+ (optional, Stage 2)
 
 ## 🚀 Quick Start

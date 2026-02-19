@@ -5,7 +5,7 @@
 ###  Poetry         ###
 ###                 ###
 # Add dependencies to pyproject.toml
-poetry add fastapi httpx pydantic pydantic-settings
+poetry add fastapi httpx pydantic pydantic-settings sqlalchemy[asyncio] asyncpg psycopg[binary] alembic psycopg2-binary
 poetry add python-dotenv black isort ruff mypy pre-commit twine --group dev
 poetry add pytest pytest-cov pytest-asyncio --group test
 poetry add uvicorn --group prod
@@ -83,7 +83,8 @@ docker ps -a | grep green-fintech
 # Start PostgreSQL only (no app container)
 docker compose up -d postgres
 
-# Use pgpass Feature Branch 1.4: PostgreSQL with Docker
+# Show logs to verify PostgreSQL started successfully for the last 5 minutes
+docker compose logs --since 5m
 
 # Start PostgreSQL (automatically creates .pgpass)
 ./scripts/db-helper.sh start
@@ -100,11 +101,51 @@ docker compose up -d postgres
 # See table sizes
 ./scripts/db-helper.sh tables
 
-# Run custom query
+# Run custom queries
 ./scripts/db-helper.sh sql "SELECT 'Hello' as greeting;"
+
+# 1. Check the tables were created
+./scripts/db-helper.sh "\dt"
+
+# 2. Check the alembic version table
+./scripts/db-helper.sh "SELECT * FROM alembic_version;"
+
+# 3. Verify indexes were created
+./scripts/db-helper.sh "\di"
 
 # Test all access methods
 ./scripts/db-helper.sh test-access
 
 # When done, .pgpass is automatically cleaned up
 ./scripts/db-helper.sh stop
+
+sudo lsof -i :5432 || echo "Port 5432 is free"
+source .env
+
+
+###                 ###
+###  ALEMBIC        ###
+###                 ####
+
+# Initialize Alembic (creates alembic/ directory and alembic.ini file)
+poetry run alembic revision --autogenerate -m "Create companies table"
+
+# Apply migrations to the database with
+#   -h, which shows the help message for the upgrade command, and then run the upgrade command to apply all migrations up to the latest revision (head)
+poetry run alembic -h
+
+#   --sql option generates the SQL statements without executing them, allowing you to review the migration plan before applying it to the database.
+poetry run alembic upgrade head --sql
+
+#   --tag option allows you to specify a tag for the migration, which can be used to group related migrations together or to indicate the purpose of the migration.
+poetry run alembic upgrade head --tag "initial migration"
+
+# Check if revision command with autogenerate has pending upgrade ops.
+poetry run alembic check
+# Display the current revision for a database.
+poetry run alembic current
+# Revert to a previous version.
+poetry run alembic downgrade -1
+
+# View migration script history from the latest revision to the given revision, with verbose output
+alembic history -r6df59d73aea3: --verbose
