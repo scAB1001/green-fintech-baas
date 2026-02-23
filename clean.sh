@@ -70,6 +70,15 @@ poetry run uvicorn app.main:app --reload
 # Go to /docs to see auto-generated API docs
 # Go to /
 
+# Run only marked "API" tests
+poetry run pytest -v -m api
+
+# Run with debug logs enabled
+poetry run pytest -v --log-cli-level=DEBUG
+
+# Run with coverage report
+poetry run pytest --cov=app --cov-report=term-missing
+
 
 ###                 ###
 ###  DOCKER         ###
