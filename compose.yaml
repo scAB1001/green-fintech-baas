@@ -20,8 +20,8 @@ services:
       # Custom initialization scripts (optional)
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
       # Custom configuration (optional)
-      - ./scripts/postgresql.custom.conf:/etc/postgresql/postgresql.conf:ro
-      # - ./scripts/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      # - ./scripts/postgresql.custom.conf:/etc/postgresql/postgresql.conf:ro
+      - ./scripts/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-green_fintech}"]
