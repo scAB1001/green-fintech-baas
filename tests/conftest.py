@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from app.database import Base
 from app.database.session import get_db
@@ -55,13 +56,28 @@ def test_db_url(docker_ip, docker_services) -> str:
 # --- The "Scope-Fixing" Engine ---
 
 
-@pytest_asyncio.fixture(scope="session")
+# @pytest_asyncio.fixture(scope="session")
+# async def test_engine(test_db_url: str) -> AsyncGenerator[AsyncEngine, None]:
+#     """
+#     Session-scoped engine.
+#     In pytest-asyncio 0.23+, 'asyncio_default_test_loop_scope' handles the runner.
+#     """
+#     engine = create_async_engine(test_db_url, echo=False)
+
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+
+#     yield engine
+#     await engine.dispose()
+
+@pytest_asyncio.fixture(scope="function")  # Match the test scope
 async def test_engine(test_db_url: str) -> AsyncGenerator[AsyncEngine, None]:
-    """
-    Session-scoped engine.
-    In pytest-asyncio 0.23+, 'asyncio_default_test_loop_scope' handles the runner.
-    """
-    engine = create_async_engine(test_db_url, echo=False)
+    """Fresh engine for every test to avoid 'Closed Loop' errors."""
+    engine = create_async_engine(
+        test_db_url,
+        poolclass=NullPool,  # Don't pool connections across different loops
+        echo=False
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -70,16 +86,39 @@ async def test_engine(test_db_url: str) -> AsyncGenerator[AsyncEngine, None]:
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
-    """Function-scoped session with automatic rollback."""
-    async_session = async_sessionmaker(
-        test_engine, class_=AsyncSession, expire_on_commit=False)
+    """
+    Function-scoped session using a clean connection.
+    We use a transaction to ensure rollback after the test.
+    """
+    async with test_engine.connect() as connection:
+        # Start a transaction
+        transaction = await connection.begin()
 
-    async with async_session() as session, session.begin():
-            yield session
-            # Rolling back ensures Test A doesn't affect Test B
-            await session.rollback()
+        # Bind the session to this specific connection
+        session = AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint"
+        )
+
+        yield session
+
+        # Cleanup
+        await session.close()
+        await transaction.rollback()
+
+# @pytest_asyncio.fixture
+# async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
+#     """Function-scoped session with automatic rollback."""
+#     async_session = async_sessionmaker(
+#         test_engine, class_=AsyncSession, expire_on_commit=False)
+
+#     async with async_session() as session, session.begin():
+#             yield session
+#             # Rolling back ensures Test A doesn't affect Test B
+#             await session.rollback()
 
 
 @pytest_asyncio.fixture
