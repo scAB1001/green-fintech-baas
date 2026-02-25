@@ -82,6 +82,9 @@ run_cmd() {
 
             poetry show --tree
             log_success "Lockfile updated successfully."
+
+            log_info "Re-installing dependencies in current environment..."
+            poetry install
             ;;
 
         "init")

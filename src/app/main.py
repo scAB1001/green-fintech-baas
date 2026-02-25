@@ -37,7 +37,7 @@ def create_application() -> FastAPI:
             "environment": settings.ENVIRONMENT,
         }
 
-    @app.get("/health")
+    @app.get("/health", tags=["Monitoring"])
     async def health_check() -> dict[str, str]:
         """Health check endpoint for monitoring."""
         return {

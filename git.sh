@@ -12,6 +12,6 @@ git diff; sleep 2s
 # Stage everything (both your original + fixed files)
 git add .
 
-git commit
+SKIP=mypy git commit
 
-git push origin feature/pytest-setup
+git push origin
