@@ -7,37 +7,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 ORANGE='\033[0;33m'
 BLUE='\033[0;34m'
+BOLD='\033[1m'
 NC='\033[0m'
 
-warn() {
-    echo -e "${YELLOW}⚠ $1${NC}"
-}
-
-serious() {
-    echo -e "${ORANGE}⚠ $1${NC}"
-}
-
-error() {
-    echo -e "${RED}✗ $1${NC}"
-    exit 1
-}
-
-success() {
-    echo -e "${GREEN}✓ $1${NC}"
-}
-
-info() {
-    echo -e "${BLUE}  $1${NC}"
-}
-
-data() {
-    echo -e "${NC}  > $1${NC}"
-}
+log_warn()      { echo -e " ${YELLOW}${BOLD}⚠${YELLOW} $1${NC}"; }
+log_serious()   { echo -e " ${ORANGE}${BOLD}⚠${ORANGE} $1${NC}"; }
+log_error()     { echo -e " ${RED}${BOLD}✗${RED} $1${NC}"; }
+log_success()   { echo -e " ${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"; }
+log_data()      { echo -e " ${NC}${BOLD}  >${NC} $1${NC}"; }
+log_info()      { echo -e " ${BLUE}  $1${NC}"; }
 
 # Load environment variables from .env
 load_env() {
     if [ -f .env ]; then
-        info "Loading configuration from .env file..."
+        log_info "Loading configuration from .env file..."
 
         # Read .env line by line, ignoring comments and empty lines
         while IFS= read -r line || [ -n "$line" ]; do
@@ -49,9 +32,9 @@ load_env() {
             fi
         done < .env
 
-        success Loaded environment variables from .env:
+        log_success "Loaded environment variables from .env:"
     else
-        warn "No .env file found, using defaults"
+        log_warn "No .env file found, using defaults"
         # Default values if no .env
         export POSTGRES_USER=postgres
         export POSTGRES_PASSWORD=postgres
@@ -63,12 +46,12 @@ load_env() {
 
 # Display loaded configuration (hide password)
 show_env() {
-    info "Current Environment Configuration:"
-    data "User: ${POSTGRES_USER}"
-    data "Database: ${POSTGRES_DB}"
-    data "Port: ${POSTGRES_PORT}"
-    data "Init Args: ${POSTGRES_INITDB_ARGS}"
-    data "DATABASE_URL: ${DATABASE_URL/postgres:$POSTGRES_PASSWORD@/postgres:[HIDDEN]@}"
+    log_info "Current Environment Configuration:"
+    log_data "User: ${POSTGRES_USER}"
+    log_data "Database: ${POSTGRES_DB}"
+    log_data "Port: ${POSTGRES_PORT}"
+    log_data "Init Args: ${POSTGRES_INITDB_ARGS}"
+    log_data "DATABASE_URL: ${DATABASE_URL/postgres:$POSTGRES_PASSWORD@/postgres:[HIDDEN]@}"
 }
 
 # Set DATABASE_URL for applications (using asyncpg driver)
@@ -79,24 +62,24 @@ COMPOSE_CMD="docker compose"
 # Create temporary .pgpass file in the container
 setup_pgpass() {
     if ! docker ps --format '{{.Names}}' | grep -q "^green-fintech-db$"; then
-        warn "PostgreSQL container not running, skipping .pgpass setup"
+        log_warn "PostgreSQL container not running, skipping .pgpass setup"
         return 1
     fi
 
-    info "Setting up temporary .pgpass for secure authentication..."
+    log_info "Setting up temporary .pgpass for secure authentication..."
 
     # Create .pgpass file with proper format: hostname:port:database:username:password
     local pgpass_content="localhost:${POSTGRES_PORT}:${POSTGRES_DB}:${POSTGRES_USER}:${POSTGRES_PASSWORD}"
 
     # Write to container and set secure permissions
     if docker exec green-fintech-db sh -c "echo '$pgpass_content' > /tmp/.pgpass && chmod 600 /tmp/.pgpass"; then
-        success ".pgpass created successfully"
+        log_success ".pgpass created successfully"
 
         # Verify the file exists and has correct permissions
         docker exec green-fintech-db sh -c "ls -la /tmp/.pgpass" > /dev/null 2>&1
         return 0
     else
-        error "Failed to create .pgpass"
+        log_error "Failed to create .pgpass"
         return 1
     fi
 }
@@ -105,9 +88,9 @@ setup_pgpass() {
 cleanup_pgpass() {
     if docker ps --format '{{.Names}}' | grep -q "^green-fintech-db$"; then
         if docker exec green-fintech-db sh -c "test -f /tmp/.pgpass" 2>/dev/null; then
-            warn "Cleaning up temporary .pgpass file..."
+            log_warn "Cleaning up temporary .pgpass file..."
             docker exec green-fintech-db rm /tmp/.pgpass
-            success ".pgpass removed"
+            log_success ".pgpass removed"
         fi
     fi
 }
@@ -118,26 +101,26 @@ trap cleanup_pgpass EXIT
 check_postgres() {
     if docker ps --format '{{.Names}}' | grep -q "^green-fintech-db$"; then
         if docker exec green-fintech-db pg_isready -U ${POSTGRES_USER} >/dev/null 2>&1; then
-            success "PostgreSQL is running and accepting connections"
+            log_success "PostgreSQL is running and accepting connections"
 
             # Show authentication method (for verification)
             AUTH_METHOD=$(docker exec green-fintech-db psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -t -c "SELECT auth_method FROM pg_hba_file_rules WHERE auth_method IS NOT NULL LIMIT 1;" 2>/dev/null | xargs)
             if [ -n "$AUTH_METHOD" ]; then
-                warn "  Authentication: ${AUTH_METHOD:-scram-sha-256}"
+                log_warn "  Authentication: ${AUTH_METHOD:-scram-sha-256}"
             fi
             return 0
         else
-            warn "PostgreSQL container is running but not yet accepting connections"
+            log_warn "PostgreSQL container is running but not yet accepting connections"
             return 1
         fi
     else
-        error "PostgreSQL container is not running"
+        log_error "PostgreSQL container is not running"
         return 1
     fi
 }
 
 start() {
-    warn "Starting PostgreSQL with SCRAM-SHA-256 authentication..."
+    log_warn "Starting PostgreSQL with SCRAM-SHA-256 authentication..."
 
     # Export environment variables for docker-compose
     export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_PORT POSTGRES_INITDB_ARGS
@@ -146,46 +129,46 @@ start() {
 
     # Wait for PostgreSQL to be ready
     echo
-    warn "Waiting for PostgreSQL to be ready..."
+    log_warn "Waiting for PostgreSQL to be ready..."
     for i in {1..30}; do
         if docker exec green-fintech-db pg_isready -U ${POSTGRES_USER} >/dev/null 2>&1; then
-            success "PostgreSQL is ready with SCRAM-SHA-256 authentication"
+            log_success "PostgreSQL is ready with SCRAM-SHA-256 authentication"
 
             # Verify authentication method
             sleep 2  # Give PostgreSQL a moment to fully initialize
             AUTH_CHECK=$(docker exec green-fintech-db psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "SELECT 'Authentication: ' || auth_method FROM pg_hba_file_rules WHERE auth_method IS NOT NULL LIMIT 1;" 2>/dev/null || echo "")
             if [ -n "$AUTH_CHECK" ]; then
-                success "$AUTH_CHECK"
+                log_success "$AUTH_CHECK"
             fi
             return 0
         fi
         echo -n "."
         sleep 1
     done
-    error "Timed out waiting for PostgreSQL"
+    log_error "Timed out waiting for PostgreSQL"
     return 1
 }
 
 stop() {
-    warn "Stopping PostgreSQL..."
+    log_warn "Stopping PostgreSQL..."
     $COMPOSE_CMD stop postgres
-    success "PostgreSQL stopped"
+    log_success "PostgreSQL stopped"
 }
 
 reset() {
-    serious "WARNING: This will delete ALL data!"
-    warn "Database: ${POSTGRES_DB}"
-    warn "User: ${POSTGRES_USER}"
+    log_serious "WARNING: This will delete ALL data!"
+    log_warn "Database: ${POSTGRES_DB}"
+    log_warn "User: ${POSTGRES_USER}"
     read -p " Are you sure? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        warn "Stopping and removing volumes..."
+        log_warn "Stopping and removing volumes..."
         $COMPOSE_CMD down -v
         echo
-        warn "Starting fresh with SCRAM-SHA-256 authentication..."
+        log_warn "Starting fresh with SCRAM-SHA-256 authentication..."
         echo
         start
-        success "Database reset complete with secure authentication"
+        log_success "Database reset complete with secure authentication"
     fi
 }
 
@@ -206,7 +189,7 @@ logs() {
 backup() {
     mkdir -p backups
     local backup_file="backups/backup_$(date +%Y%m%d_%H%M%S).sql"
-    warn "Creating backup: $backup_file"
+    log_warn "Creating backup: $backup_file"
 
     if [ -n "$POSTGRES_PASSWORD" ]; then
         export PGPASSWORD=$POSTGRES_PASSWORD
@@ -215,18 +198,18 @@ backup() {
         docker exec green-fintech-db pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > "$backup_file"
     fi
 
-    success "Backup created: $backup_file ($(du -h "$backup_file" | cut -f1))"
+    log_success "Backup created: $backup_file ($(du -h "$backup_file" | cut -f1))"
 }
 
 restore() {
     local backup_file=$1
     if [ ! -f "$backup_file" ]; then
-        error "Error: Backup file not found: $backup_file"
+        log_error "Error: Backup file not found: $backup_file"
         exit 1
     fi
 
-    warn "Restoring from: $backup_file"
-    serious "WARNING: This will overwrite current data!"
+    log_warn "Restoring from: $backup_file"
+    log_serious "WARNING: This will overwrite current data!"
     read -p "Continue? (y/N) " -n 1 -r
     echo
 
@@ -237,7 +220,7 @@ restore() {
         else
             cat "$backup_file" | docker exec -i green-fintech-db psql -U ${POSTGRES_USER} ${POSTGRES_DB}
         fi
-        success "Restore complete"
+        log_success "Restore complete"
     fi
 }
 
@@ -245,9 +228,13 @@ restore() {
 show_config() {
     show_env
 
+    # Check the port is open
+    sudo lsof -i :5432 || echo "Port 5432 is free"
+    # source .env
+
     if check_postgres >/dev/null 2>&1; then
         echo
-        info "Runtime Configuration:"
+        log_info "Runtime Configuration:"
 
         # Try multiple methods to query settings
         if [ -n "$POSTGRES_PASSWORD" ]; then
@@ -261,8 +248,8 @@ show_config() {
             fi
         fi
 
-        warn "Unable to query runtime settings (authentication required)"
-        info "Run './scripts/db-helper.sh psql' to connect interactively"
+        log_warn "Unable to query runtime settings (authentication required)"
+        log_info "Run './scripts/db-helper.sh psql' to connect interactively"
     fi
 }
 
@@ -270,7 +257,7 @@ show_config() {
 run_sql() {
     local query="$1"
     if [ -z "$query" ]; then
-        error "Error: No SQL query provided"
+        log_error "Error: No SQL query provided"
         return 1
     fi
 
@@ -278,7 +265,7 @@ run_sql() {
     docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" green-fintech-db \
         psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
         -t -c "$query" 2>/dev/null || {
-        error "Error running SQL command"
+        log_error "Error running SQL command"
         return 1
     }
 }
@@ -286,7 +273,7 @@ run_sql() {
 # Show active connections
 active_connections() {
     echo
-    info "Active Database Connections:"
+    log_info "Active Database Connections:"
     run_sql "SELECT
         pid,
         usename,
@@ -302,7 +289,7 @@ active_connections() {
 # Show database statistics
 db_stats() {
     echo
-    info "Database Statistics:"
+    log_info "Database Statistics:"
     run_sql "SELECT
         datname as database_name,
         numbackends as connections,
@@ -317,7 +304,7 @@ db_stats() {
 # Show table sizes
 table_sizes() {
     echo
-    info "Table Sizes:"
+    log_info "Table Sizes:"
     run_sql "SELECT
         relname as table_name,
         pg_size_pretty(pg_total_relation_size(relid)) as total_size,
@@ -330,30 +317,30 @@ table_sizes() {
 
 # Test all access methods
 test_access() {
-    info "Testing PostgreSQL access methods:"
+    log_info "Testing PostgreSQL access methods:"
 
     # Method 1: PGPASSFILE
     echo -n "  Method 1 (PGPASSFILE): "
     if docker exec -e PGPASSFILE=/tmp/.pgpass green-fintech-db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
-        success "Success"
+        log_success "Success"
     else
-        error "Failed"
+        log_error "Failed"
     fi
 
     # Method 2: PGPASSWORD
     echo -n "  Method 2 (PGPASSWORD): "
     if docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" green-fintech-db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
-        success "Success"
+        log_success "Success"
     else
-        error "Failed"
+        log_error "Failed"
     fi
 
     # Method 3: Connection string
     echo -n "  Method 3 (URI): "
     if docker exec green-fintech-db psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
-        success "Success"
+        log_success "Success"
     else
-        error "Failed"
+        log_error "Failed"
     fi
 }
 
@@ -388,21 +375,21 @@ main() {
             echo "Usage: $0 {start|stop|restart|status|reset|psql|logs|backup|restore|config|connections|stats|tables|sql|test-access}"
             echo
             echo "Commands:"
-            info "start        - Start PostgreSQL with SCRAM-SHA-256 auth"
-            info "stop         - Stop PostgreSQL container"
-            info "restart      - Restart PostgreSQL container"
-            info "status       - Check if PostgreSQL is running"
-            info "reset        - WARNING: Delete all data and start fresh"
-            info "psql         - Connect to PostgreSQL with psql"
-            info "logs         - Show PostgreSQL logs"
-            info "backup       - Create a database backup"
-            info "restore      - Restore from a backup file"
-            info "config       - Show current configuration"
-            info "connections  - Show active database connections"
-            info "stats        - Show database statistics"
-            info "tables       - Show table sizes"
-            info "sql 'query'  - Run a SQL query"
-            info "test-access  - Test all access methods"
+            log_info "start        - Start PostgreSQL with SCRAM-SHA-256 auth"
+            log_info "stop         - Stop PostgreSQL container"
+            log_info "restart      - Restart PostgreSQL container"
+            log_info "status       - Check if PostgreSQL is running"
+            log_info "reset        - WARNING: Delete all data and start fresh"
+            log_info "psql         - Connect to PostgreSQL with psql"
+            log_info "logs         - Show PostgreSQL logs"
+            log_info "backup       - Create a database backup"
+            log_info "restore      - Restore from a backup file"
+            log_info "config       - Show current configuration"
+            log_info "connections  - Show active database connections"
+            log_info "stats        - Show database statistics"
+            log_info "tables       - Show table sizes"
+            log_info "sql 'query'  - Run a SQL query"
+            log_info "test-access  - Test all access methods"
             exit 1
             ;;
     esac

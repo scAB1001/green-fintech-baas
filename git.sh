@@ -14,4 +14,4 @@ git add .
 
 git commit
 
-git push origin feature/sqlalchemy-alembic
+git push origin feature/pytest-setup
