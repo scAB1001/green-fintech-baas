@@ -104,8 +104,8 @@ run_cmd() {
             log_info "Adding documentation dependencies..."
             poetry add sphinx --group docs
 
-            log_info "Exporting dependencies to requirements.txt..."
-            poetry export -f requirements.txt --output requirements.txt --without-hashes
+            log_info "Exporting all dependencies to requirements.txt..."
+            poetry export -f requirements.txt --output requirements.txt --without-hashes --all-groups
 
             log_info "Installing dependencies in current environment..."
             # --without test
