@@ -9,6 +9,7 @@
         - id: end-of-file-fixer
           name: Fix EOF Formatting with Newline
           description: This hook ensures files end in a newline and only a newline.
+        # TODO: Remove
         # - id: double-quote-string-fixer
         #   name: Fix Double Quoted Strings to Single
         #   description: This hook replaces double quoted strings with single quoted strings.
@@ -122,7 +123,7 @@
             -ignore=SC2(046|086),
           ]
           additional_dependencies:
-            # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
-            # and checks these with shellcheck. This is arguably its most useful feature,
-            # but the integration only works if shellcheck is installed
+            # actionlint has a shellcheck integration which extracts
+            # shell scripts in `run:` steps from GitHub Actions
+            # shellcheck must be installed
             - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"

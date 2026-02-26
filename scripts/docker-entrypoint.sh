@@ -96,6 +96,12 @@ create_initial_data() {
 main() {
     # Wait for database if DATABASE_URL is set
     if [[ -n "$DATABASE_URL" ]]; then
+        # Ensure the DATABASE_URL uses the asyncpg driver
+        # Replace postgres:// with postgresql+asyncpg:// if needed
+        DATABASE_URL=$(echo $DATABASE_URL | sed 's/^postgres:\/\//postgresql+asyncpg:\/\//')
+        DATABASE_URL=$(echo $DATABASE_URL | sed 's/^postgresql:\/\//postgresql+asyncpg:\/\//')
+        export DATABASE_URL
+
         wait_for_db
         run_migrations
         create_initial_data
@@ -109,14 +115,14 @@ main() {
 
     # Development mode
     if [ "${ENVIRONMENT:-development}" = "development" ]; then
-        exec uvicorn src.app.main:app \
+        exec uvicorn app.main:app \
             --host ${HOST:-0.0.0.0} \
             --port ${PORT:-8000} \
             --reload \
             --log-level debug
     # Production mode
     else
-        exec uvicorn src.app.main:app \
+        exec uvicorn app.main:app \
             --host ${HOST:-0.0.0.0} \
             --port ${PORT:-8000} \
             --workers ${WORKERS:-4} \
