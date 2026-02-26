@@ -30,27 +30,28 @@ show_menu() {
     echo -e "${YELLOW}Current Environment:${NC} $(poetry env info --path 2>/dev/null || echo 'None')"
     echo -e "-------------------------------------------------------------------------  "
     echo -e "${BOLD}Setup & Maintenance:${NC}"
-    echo -e "  01) ${BLUE}[init]${NC}       Install all dependencies"
-    echo -e "  02) ${BLUE}[lock]${NC}       Update lockfile & show tree"
-    echo -e "  03) ${BLUE}[lint]${NC}       Format & Lint code"
+    echo -e "  01) ${BLUE}[init]${NC}           Install all dependencies"
+    echo -e "  02) ${BLUE}[poetry-lock]${NC}    Update Poetry lockfile & show tree"
+    echo -e "  03) ${BLUE}[lint]${NC}           Format & Lint code"
     echo -e "${BOLD}Database Operations:${NC}"
-    echo -e "  04) ${BLUE}[db-up]${NC}      Reset & Start Postgres"
-    echo -e "  05) ${BLUE}[migrate]${NC}    Create & Apply migrations"
-    echo -e "  06) ${BLUE}[db-stat]${NC}    Check DB health/stats"
-    echo -e "  07) ${BLUE}[db-sql]${NC}     Run custom SQL"
+    echo -e "  04) ${BLUE}[db-up]${NC}          Reset & Start Postgres"
+    echo -e "  05) ${BLUE}[migrate]${NC}        Create & Apply migrations"
+    echo -e "  06) ${BLUE}[db-stat]${NC}        Check DB health/stats"
+    echo -e "  07) ${BLUE}[db-sql]${NC}         Run custom SQL"
     echo -e "${BOLD}Testing & Execution:${NC}"
-    echo -e "  08) ${BLUE}[test]${NC}       Run Pytest (Standard)"
-    echo -e "  09) ${BLUE}[cov]${NC}        Run Pytest (Coverage)"
-    echo -e "  10) ${BLUE}[run]${NC}        Start FastAPI dev server"
+    echo -e "  08) ${BLUE}[test]${NC}           Run Pytest (Standard)"
+    echo -e "  09) ${BLUE}[cov]${NC}            Run Pytest (Coverage)"
+    echo -e "  10) ${BLUE}[run]${NC}            Start FastAPI dev server"
     echo -e "${BOLD}Deployment:${NC}"
-    echo -e "  11) ${BLUE}[build]${NC}      Package for PyPI"
-    echo -e "  12) ${BLUE}[clean]${NC}      Remove cache & build artifacts"
+    echo -e "  11) ${BLUE}[build]${NC}          Package for PyPI"
+    echo -e "  12) ${BLUE}[clean]${NC}          Remove cache & build artifacts"
+    echo -e "  13) ${BLUE}[uv-lock]${NC}        Update UV lockfile & show tree"
     echo -e "   q) ${RED}[Quit]${NC}"
     echo -ne "\n${YELLOW}Select an option: ${NC}"
     read -r opt
     case $opt in
         1)  run_cmd "init" ;;
-        2)  run_cmd "lock" ;;
+        2)  run_cmd "poetry-lock" ;;
         3)  run_cmd "lint" ;;
         4)  run_cmd "db-up" ;;
         5)  run_cmd "db-migrate" ;;
@@ -61,6 +62,7 @@ show_menu() {
         10) run_cmd "run" ;;
         11) run_cmd "build" ;;
         12) run_cmd "clean" ;;
+        13) run_cmd "uv-lock" ;;
         q)  exit 0 ;;
         *)  log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -70,21 +72,20 @@ show_menu() {
 # --- Command Logic ---
 run_cmd() {
     case "$1" in
-        "lock")
+        "poetry-lock")
             header "UPDATING POETRY LOCKFILE"
             log_info "Resolving dependencies and updating lockfile..."
-
             poetry lock --regenerate
+
             log_info "Checking lockfile integrity..."
-
             poetry check --lock --strict
-            log_info "Displaying dependency tree..."
 
+            log_info "Displaying dependency tree..."
             poetry show --tree
-            log_success "Lockfile updated successfully."
 
             log_info "Re-installing dependencies in current environment..."
             poetry install
+            log_success "Lockfile updated successfully."
             ;;
 
         "init")
@@ -302,7 +303,18 @@ run_cmd() {
 
             log_success "Workspace cleaned."
             ;;
+        "uv-lock")
+            header "UPDATING UV LOCKFILE"
+            log_info "Resolving dependencies and updating lockfile..."
+            uv lock --upgrade
 
+            log_info "Checking lockfile integrity..."
+            uv lock --check
+
+            # log_info "Syncing dependencies to current environment..."
+            # uv sync
+            log_success "Lockfile updated successfully."
+        ;;
         *)
             echo -e "${CYAN}${BOLD}Green FinTech BaaS - CLI Tools${NC}"
             echo -e "Usage: ./exec.sh [command]\n"

@@ -35,7 +35,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv pip install --system -r requirements.txt  # uv sync --no-dev
+        run: uv pip sync requirements.txt
 
       - name: Run Tests
         env:
