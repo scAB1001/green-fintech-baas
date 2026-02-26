@@ -229,7 +229,13 @@ show_config() {
     show_env
 
     # Check the port is open
-    sudo lsof -i :5432 || echo "Port 5432 is free"
+    if lsof -i :5432 -sTCP:LISTEN -t >/dev/null ; then
+        log_success "Port 5432 is open and listening"
+    else
+        log_warn "Port 5432 is not open or not listening"
+        log_info "Killing any process using port 5432..."
+        sudo lsof -i :5432 -t | xargs kill -9 2>/dev/null || true
+    fi
     # source .env
 
     if check_postgres >/dev/null 2>&1; then

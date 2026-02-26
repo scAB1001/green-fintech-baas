@@ -112,29 +112,29 @@ run_cmd() {
             poetry install --with dev,test,prod,docs
 
             log_info "Setting up pre-commit hooks..."
-            poetry run pre-commit install
+            pre-commit install
             log_success "Dependencies added and environment initialized."
             ;;
 
         "lint")
             header "RUNNING STATIC ANALYSIS"
             log_info "Updating pre-commit hooks..."
-            poetry run pre-commit autoupdate
+            pre-commit autoupdate
 
             log_info "Showing unsafe fixes..."
-            poetry run ruff check --unsafe-fixes src/ tests/ || true
+            ruff check --unsafe-fixes src/ tests/ || true
 
             log_info "Running Ruff..."
-            poetry run ruff check --fix src/ tests/ --show-diff-on-failure
+            ruff check --fix src/ tests/ --show-diff-on-failure
 
             log_info "Ruff enforce check for F401 and F403 rules..."
-            poetry run ruff check src/ tests/ --select F401,F403
+            ruff check src/ tests/ --select F401,F403
 
             log_info "Running Black..."
-            poetry run black src/ tests/
+            black src/ tests/
 
             log_info "Running Pre-commit hooks..."
-            poetry run pre-commit run --all-files --verbose
+            pre-commit run --all-files --verbose
             log_success "Linting complete."
             ;;
 
@@ -226,16 +226,16 @@ run_cmd() {
             # Tip: pytest -v --log-cli-level=DEBUG
             if [ "$2" == "cov" ]; then
                 log_info "Running tests with coverage report..."
-                poetry run pytest --cov=src --cov-report=term-missing
+                pytest --cov=src --cov-report=term-missing
             else
                 log_info "Running tests (standard mode)..."
-                poetry run pytest -v -m "${2:-not slow}"
+                pytest -v -m "${2:-not slow}"
             fi
 
             # TODO: Add marker test options for "slow", "db", "api", etc. (pytest -m integration)
             # read -p "View test coverage report? (y/n) " view_cov
             # if [[ "$view_cov" == "y" ]]; then
-            #     poetry run pytest --cov=src --cov-report=html
+            #     pytest --cov=src --cov-report=html
             #     log_info "Opening coverage report in browser..."
             #     xdg-open htmlcov/index.html
             # fi
@@ -244,9 +244,27 @@ run_cmd() {
             # read -p "Run specific test file or directory? (y/n) " run_specific
             # if [[ "$run_specific" == "y" ]]; then
             #     read -p "Enter test file or directory within tests/ (e.g., db_test.py): " test_path
-            #     poetry run pytest -v "$test_path"
+            #     pytest -v "$test_path"
             # fi
+            ;;
 
+        "run")
+            header "STARTING DEVELOPMENT SERVER"
+            log_info "Starting PostgreSQL Database..."
+            ./scripts/db-helper.sh start
+
+            if lsof -i :8000 -t >/dev/null ; then
+                log_warn "Port 8000 is already in use."
+
+                log_info "Killing process using port 8000..."
+                sudo lsof -i :8000 -t | xargs kill -9 2>/dev/null || true
+                log_success "Port 8000 is free"
+            fi
+
+            log_info "Launching FastAPI development server..."
+            uvicorn app.main:app --reload --host 0.0.0.0
+            # Go to /docs to see auto-generated API docs
+            # Go to /health to check API health endpoint
             ;;
 
         "build")
@@ -267,7 +285,7 @@ run_cmd() {
             poetry config repositories.testpypi https://test.pypi.org/legacy/
 
             log_info "Uploading package..."
-            poetry run twine upload --repository testpypi dist/* --verbose
+            twine upload --repository testpypi dist/* --verbose
             ;;
 
         "clean")
