@@ -231,6 +231,22 @@ run_cmd() {
                 log_info "Running tests (standard mode)..."
                 poetry run pytest -v -m "${2:-not slow}"
             fi
+
+            # TODO: Add marker test options for "slow", "db", "api", etc. (pytest -m integration)
+            # read -p "View test coverage report? (y/n) " view_cov
+            # if [[ "$view_cov" == "y" ]]; then
+            #     poetry run pytest --cov=src --cov-report=html
+            #     log_info "Opening coverage report in browser..."
+            #     xdg-open htmlcov/index.html
+            # fi
+
+            # TODO: Add further specific test file or directory options (pytest -s tests/db_test.py)
+            # read -p "Run specific test file or directory? (y/n) " run_specific
+            # if [[ "$run_specific" == "y" ]]; then
+            #     read -p "Enter test file or directory within tests/ (e.g., db_test.py): " test_path
+            #     poetry run pytest -v "$test_path"
+            # fi
+
             ;;
 
         "build")

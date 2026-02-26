@@ -11,7 +11,7 @@ class EnvironmentalMetricBase(BaseModel):
 
 
 class EnvironmentalMetricCreate(EnvironmentalMetricBase):
-    company_id: int  # Required for creation
+    company_id: int
 
 
 class EnvironmentalMetric(EnvironmentalMetricBase):

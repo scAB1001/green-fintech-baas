@@ -7,7 +7,7 @@ cd green-fintech-baas/
 git status; sleep 2s
 
 # Review the changes
-git diff; sleep 2s
+git diff
 
 # Stage everything (both your original + fixed files)
 git add .

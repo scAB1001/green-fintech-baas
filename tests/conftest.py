@@ -1,5 +1,7 @@
 # tests/conftest.py
 import asyncio
+import json
+import pathlib
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
@@ -17,10 +19,10 @@ from sqlalchemy.pool import NullPool
 from app.database import Base
 from app.database.session import get_db
 from app.main import app
+from app.models.company import Company
+
 
 # --- pytest-docker fixtures ---
-
-
 @pytest.fixture(scope="session")
 def docker_compose_file():
     # Points exactly to your test-specific compose
@@ -53,24 +55,9 @@ def test_db_url(docker_ip, docker_services) -> str:
         timeout=30.0, pause=0.5, check=is_db_responsive)
     return db_url
 
+
 # --- The "Scope-Fixing" Engine ---
-
-
-# @pytest_asyncio.fixture(scope="session")
-# async def test_engine(test_db_url: str) -> AsyncGenerator[AsyncEngine, None]:
-#     """
-#     Session-scoped engine.
-#     In pytest-asyncio 0.23+, 'asyncio_default_test_loop_scope' handles the runner.
-#     """
-#     engine = create_async_engine(test_db_url, echo=False)
-
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.create_all)
-
-#     yield engine
-#     await engine.dispose()
-
-@pytest_asyncio.fixture(scope="function")  # Match the test scope
+@pytest_asyncio.fixture(scope="function")
 async def test_engine(test_db_url: str) -> AsyncGenerator[AsyncEngine, None]:
     """Fresh engine for every test to avoid 'Closed Loop' errors."""
     engine = create_async_engine(
@@ -109,23 +96,13 @@ async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, N
         await session.close()
         await transaction.rollback()
 
-# @pytest_asyncio.fixture
-# async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
-#     """Function-scoped session with automatic rollback."""
-#     async_session = async_sessionmaker(
-#         test_engine, class_=AsyncSession, expire_on_commit=False)
-
-#     async with async_session() as session, session.begin():
-#             yield session
-#             # Rolling back ensures Test A doesn't affect Test B
-#             await session.rollback()
-
 
 @pytest_asyncio.fixture
 async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
     Industry-standard AsyncClient setup.
     Uses ASGITransport to bridge httpx directly to the FastAPI app.
+    Override the app's get_db dependency to use the test session.
     """
     # 1. Setup Dependency Injection
     def _get_test_db():
@@ -145,3 +122,37 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
 
     # 4. Cleanup
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def seed_companies(db_session: AsyncSession):
+    """Populate the test database with standard company data."""
+    fixture_path = pathlib.Path(__file__).parent / "fixtures" / "companies.json"
+    with open(fixture_path) as f:
+        data = json.load(f)
+
+    companies = [Company(**item) for item in data]
+    db_session.add_all(companies)
+    await db_session.flush()
+    return companies
+
+
+@pytest_asyncio.fixture
+async def seed_metrics(db_session: AsyncSession, seed_companies):
+    """Populate the test database with standard environmental metrics."""
+    fixture_path = pathlib.Path(__file__).parent / "fixtures" / "metrics.json"
+    with open(fixture_path) as f:
+        data = json.load(f)
+
+    # Map company names to IDs for foreign key relationships
+    company_map = {c.name: c.id for c in seed_companies}
+
+    for item in data:
+        item["company_id"] = company_map.get(item["company_name"])
+        del item["company_name"]  # Remove name, we only need ID
+
+    from app.models.environmental_metric import EnvironmentalMetric
+    metrics = [EnvironmentalMetric(**item) for item in data]
+    db_session.add_all(metrics)
+    await db_session.flush()
+    return metrics
