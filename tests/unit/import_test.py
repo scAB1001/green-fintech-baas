@@ -1,3 +1,4 @@
+# tests/unit/import_test.py
 """Verify that the package can be imported."""
 
 from __future__ import annotations
@@ -5,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 
+@pytest.mark.unit
 def test_import():
     """Test that app module can be imported."""
     try:

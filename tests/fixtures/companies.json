@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Green Hydrogen Corp",
+    "companies_house_id": "GH123456",
+    "business_sector": "Energy",
+    "location": "Leeds"
+  },
+  {
+    "name": "SolarPlex Ltd",
+    "companies_house_id": "SP123456",
+    "business_sector": "Renewable Energy",
+    "location": "Manchester"
+  },
+  {
+    "name": "WindWay Solutions",
+    "companies_house_id": "WW888888",
+    "business_sector": "Energy",
+    "location": "Edinburgh"
+  }
+]

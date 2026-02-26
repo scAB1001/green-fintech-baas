@@ -1,4 +1,7 @@
+# src/app/database/session.py
 """Async database session management."""
+from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
@@ -30,10 +33,10 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
-async def get_db() -> AsyncSession:
-    """Dependency for FastAPI to get database session."""
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency for FastAPI to get database session.
+    The 'async with' handles opening and CLOSING the session automatically.
+    """
     async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+        yield session

@@ -48,7 +48,7 @@
           description: This hook checks for the existence of private keys.
 
     - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.15.0  # Updated to latest
+      rev: v0.15.2  # Updated to latest
       hooks:
         - id: ruff
           name: Ruff Python Linting
@@ -57,7 +57,7 @@
           args: [--fix, --exit-non-zero-on-fix]
 
     - repo: https://github.com/pycqa/isort
-      rev: 7.0.0
+      rev: 8.0.0
       hooks:
         - id: isort
           name: isort Python Import
@@ -111,7 +111,7 @@
           always_run: true
 
     - repo: https://github.com/rhysd/actionlint
-      rev: v1.7.10  # Updated to latest
+      rev: v1.7.11  # Updated to latest
       hooks:
         - id: actionlint
           name: Check Syntax for Workflow File
