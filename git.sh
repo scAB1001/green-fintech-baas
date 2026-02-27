@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Navigate to project directory
-cd green-fintech-baas/
+cd ~/github-projects/uni/sem2/comp3011/green-fintech-baas/
 
 # See all modified files
 git status; sleep 2s
