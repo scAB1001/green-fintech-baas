@@ -24,7 +24,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -87,7 +87,15 @@ jobs:
       if: github.ref == 'refs/heads/main'
 
       steps:
-        - name: Deploy to Staging
+        - uses: actions/checkout@v4
+
+        - name: Install Railway CLI
+          run: npm install -g @railway/cli
+
+        - name: Deploy to Railway
+          env:
+            RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           run: |
-            # Your deployment script to Railway/Render/Fly.io
-            echo "Deploying to staging..."
+            # --detach lets the CI finish without waiting for the build to end
+            # --service identifies which service in your project to update
+            railway up --detach --service green-fintech-api
