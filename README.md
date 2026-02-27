@@ -1,5 +1,7 @@
 # 🌱 Green FinTech BaaS Simulator API
 
+[![.github/workflows/ci.yml](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yml)
+
 A sophisticated Banking-as-a-Service (BaaS) simulation platform for green financing and ESG analytics. Built with modern Python tooling and best practices.
 
 ## 🏗️ Architecture
