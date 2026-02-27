@@ -35,7 +35,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --with test
+        run: uv sync --frozen --all-groups
 
       - name: Run Tests
         env:
