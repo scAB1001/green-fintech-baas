@@ -25,7 +25,11 @@ header()      { echo -e "\n${PURPLE}${BOLD}=========== $1 ===========${NC}"; }
 
 # --- Interactive Menu ---
 show_menu() {
+    # Activate sudo now
+    # sudo lsof -i :9999
+
     clear
+
     echo -e "${CYAN}${BOLD}🍃 Green FinTech BaaS - Interactive CLI${NC}"
     echo -e "${YELLOW}Current Environment:${NC} $(poetry env info --path 2>/dev/null || echo 'None')"
     echo -e "-------------------------------------------------------------------------  "
@@ -100,7 +104,7 @@ run_cmd() {
             poetry add pytest pytest-cov pytest-asyncio pytest-docker --group test
 
             log_info "Adding production dependencies..."
-            poetry add uvicorn --group prod
+            poetry add uvicorn redis --group prod
 
             log_info "Adding documentation dependencies..."
             poetry add sphinx --group docs
@@ -145,7 +149,7 @@ run_cmd() {
             docker ps -a
 
             log_info "Removing existing containers..."
-            docker compose down --remove-orphans -v
+            docker compose down --remove-orphans -v  # Remove -v to avoid working from scratch
 
             log_info "Starting PostgreSQL container..."
             docker compose up -d postgres
@@ -156,6 +160,19 @@ run_cmd() {
             log_info "Starting postgres database..."
             ./scripts/db-helper.sh start
             log_success "PostgreSQL is active."
+
+            log_info "Starting Redis container..."
+            docker compose up -d redis
+            log_success "Redis is Active"
+
+            log_info "Running Alembic Migrations..."
+            # We run upgrade head directly without prompting to automate the setup
+            alembic upgrade head
+            log_success "Database schema created."
+
+            log_info "Seeding Database from JSON fixtures..."
+            python scripts/seed_db.py
+            log_success "Database ready for development!"
             ;;
 
         "db-migrate")
@@ -290,6 +307,7 @@ run_cmd() {
             ;;
 
         "clean")
+            # TODO: Implement found files and dir to be removed first.
             header "CLEANING PROJECT WORKSPACE"
             log_info "Removing Python byte-code and cache..."
             find . -type d -name "__pycache__" -exec rm -rf {} +

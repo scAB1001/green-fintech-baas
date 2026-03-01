@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.company import CompanyCreate
+from app.schemas.company_schema import CompanyCreate
 
 
 @pytest.mark.unit

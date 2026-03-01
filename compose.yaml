@@ -49,6 +49,18 @@ services:
   #   networks:
   #     - green-fintech-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: green-fintech-cache
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - green-fintech-network
 networks:
   green-fintech-network:
     driver: bridge

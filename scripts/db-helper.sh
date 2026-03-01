@@ -15,7 +15,7 @@ log_serious()   { echo -e " ${ORANGE}${BOLD}⚠${ORANGE} $1${NC}"; }
 log_error()     { echo -e " ${RED}${BOLD}✗${RED} $1${NC}"; }
 log_success()   { echo -e " ${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"; }
 log_data()      { echo -e " ${NC}${BOLD}  >${NC} $1${NC}"; }
-log_info()      { echo -e " ${BLUE}  $1${NC}"; }
+log_info()      { echo -e " ${BLUE}${BOLD}i${BLUE} $1${NC}"; }
 
 # Load environment variables from .env
 load_env() {
@@ -352,6 +352,9 @@ test_access() {
 
 # Main script execution
 main() {
+    # Activate sudo now
+    # sudo lsof -i :9999
+
     # Load environment variables first
     load_env
 
