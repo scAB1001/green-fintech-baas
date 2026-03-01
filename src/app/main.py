@@ -1,3 +1,4 @@
+# src/app/main.py
 """Main FastAPI application factory."""
 
 from __future__ import annotations

@@ -10,6 +10,9 @@ from app.database.session import get_db
 from app.models.company import Company
 from app.schemas.company_schema import CompanySchema
 
+# TODO: clear_cache functionality
+# from app.core.redis import clear_cache
+
 router = APIRouter()
 
 # 1. Define the dependency using Annotated to avoid E:B008
@@ -38,3 +41,9 @@ async def get_company(company_id: int, db: DbSession):
     await set_cached_object(cache_key, company_data)
 
     return company_data
+
+
+# TODO: Add update_company and include the following:
+    # Invalidate the cache
+    # directly call await redis_client.delete(f"company:{company_id}")
+    #  or use from redis.py clear_cache(company_id)

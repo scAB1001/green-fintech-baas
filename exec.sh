@@ -165,7 +165,8 @@ run_cmd() {
             docker compose down --remove-orphans -v  # Remove -v to avoid working from scratch
 
             log_info "Starting PostgreSQL container..."
-            docker compose up -d postgres
+            # docker compose up -d postgres
+            docker compose up --build -d postgres
 
             log_info "Waiting for PG readiness..."
             sleep 2
@@ -175,7 +176,7 @@ run_cmd() {
             log_success "PostgreSQL is active."
 
             log_info "Starting Redis container..."
-            docker compose up -d redis
+            docker compose up --build -d redis
             log_success "Redis is Active"
 
             log_info "Running Alembic Migrations..."
@@ -190,6 +191,19 @@ run_cmd() {
             log_info "Pinging Redis service..."
             docker exec -it green-fintech-cache redis-cli ping
             log_success "Redis Cache Service is responding..."
+
+            if lsof -i :8000 -t >/dev/null ; then
+                log_warn "Port 8000 is already in use."
+
+                log_info "Killing process using port 8000..."
+                sudo lsof -i :8000 -t | xargs kill -9 2>/dev/null || true
+                log_success "Port 8000 is free"
+            fi
+
+            log_info "Starting FastAPI container..."
+            # docker compose up -d api
+            docker compose up --build -d api
+            log_info "FastAPI is active."
             ;;
 
         "db-migrate")
@@ -338,6 +352,10 @@ run_cmd() {
 
             log_info "Removing build artifacts..."
             rm -rf dist/ build/ *.egg-info
+
+            # TODO: docker builder prune -a  # This clears old layers
+            log_info "Pruning Old Containers"
+            docker container prune -f
 
             log_success "Workspace cleaned."
             ;;
