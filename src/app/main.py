@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.endpoints import companies
 from app.core.config import settings
 
 
@@ -44,6 +45,9 @@ def create_application() -> FastAPI:
             "status": "healthy",
             "version": settings.VERSION,
         }
+
+    app.include_router(
+        companies.router, prefix="/api/v1/companies", tags=["companies"])
 
     return app
 

@@ -55,8 +55,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-      # Fail if pyproject.toml and uv.lock aren't synced. Prevents version drifting.
-        # run: uv sync --frozen --all-groups
+      # Fail if pyproject.toml and uv.lock aren't synced. Prevents version drifting. --frozen for sync
         run: |
           uv lock
           uv sync --all-groups

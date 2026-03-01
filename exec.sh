@@ -23,6 +23,19 @@ log_warn()    { echo -e " ${YELLOW}${BOLD}⚠${NC} ${YELLOW}$1${NC}"; }
 header()      { echo -e "\n${PURPLE}${BOLD}=========== $1 ===========${NC}"; }
 
 
+# $ docker exec -it green-fintech-cache redis-cli ping
+# PONG
+# $ docker exec -it green-fintech-cache redis-cli ping
+# PONG
+# $ docker exec -it green-fintech-cache redis-cli
+# 127.0.0.1:6379> KEYS *
+# (empty array)
+# 127.0.0.1:6379> GET company:1
+# (nil)
+# 127.0.0.1:6379> SET company:1 '{"id": 1, "name": "Manual Cache Test", "location": "Redis-Land", "energy_consumption_mwh": 0, "carbon_reduction_pct": 0}'
+# OK
+
+
 # --- Interactive Menu ---
 show_menu() {
     # Activate sudo now
@@ -173,6 +186,10 @@ run_cmd() {
             log_info "Seeding Database from JSON fixtures..."
             python scripts/seed_db.py
             log_success "Database ready for development!"
+
+            log_info "Pinging Redis service..."
+            docker exec -it green-fintech-cache redis-cli ping
+            log_success "Redis Cache Service is responding..."
             ;;
 
         "db-migrate")
@@ -231,6 +248,9 @@ run_cmd() {
             header "RUNNING CUSTOM SQL"
             log_info "Starting PostgreSQL Database..."
             ./scripts/db-helper.sh start
+
+            # Helpful queries
+            # ./scripts/db-helper.sh sql "SELECT id, name FROM companies;"
 
             # Tip: "\dt", "SELECT * FROM alembic_version;", "\di"
             log_info "Enter a SQL query (e.g., \dt or SELECT * FROM table;)"

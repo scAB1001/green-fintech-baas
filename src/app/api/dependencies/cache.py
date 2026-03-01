@@ -40,15 +40,13 @@
 
 import json
 
-from app.core.redis import get_redis_client
+from app.core.redis import redis_client
 
 
 async def get_cached_object(cache_key: str):
-    redis = await get_redis_client()
-    data = await redis.get(cache_key)
+    data = await redis_client.get(cache_key)
     return json.loads(data) if data else None
 
 
 async def set_cached_object(cache_key: str, data: dict, expire: int = 3600):
-    redis = await get_redis_client()
-    await redis.setex(cache_key, expire, json.dumps(data))
+    await redis_client.setex(cache_key, expire, json.dumps(data))
