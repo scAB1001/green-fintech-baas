@@ -57,7 +57,9 @@ jobs:
       - name: Install dependencies
       # Fail if pyproject.toml and uv.lock aren't synced. Prevents version drifting.
         # run: uv sync --frozen --all-groups
-        run: uv lock
+        run: |
+          uv lock
+          uv sync --all-groups
 
       - name: Run Tests
         env:
