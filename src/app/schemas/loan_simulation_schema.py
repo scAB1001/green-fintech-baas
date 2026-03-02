@@ -14,7 +14,7 @@ class LoanSimulationCreate(LoanSimulationBase):
     company_id: int
 
 
-class LoanSimulation(LoanSimulationBase):
+class LoanSimulationSchema(LoanSimulationBase):
     id: UUID
     company_id: int
     green_score: float

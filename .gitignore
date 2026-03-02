@@ -17,7 +17,7 @@ htmlcov/
 .ruff_cache/
 
 # Poetry
-poetry.lock
+*.lock
 *.egg-info/
 dist/
 build/

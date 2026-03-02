@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+export PATH="/app/.venv/bin:$PATH"
+export PYTHONPATH="/app/src"
+VENV_PYTHON="/app/.venv/bin/python"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -76,7 +80,7 @@ wait_for_db() {
 # Function to run migrations
 run_migrations() {
     echo "Running database migrations..."
-    if alembic upgrade head; then
+    if $VENV_PYTHON -m alembic upgrade head; then
         success "Migrations completed successfully"
     else
         error "Migrations failed"
@@ -88,7 +92,7 @@ run_migrations() {
 create_initial_data() {
     if [ "${CREATE_INITIAL_DATA:-false}" = "true" ]; then
         info "Creating initial data..."
-        python -m app.scripts.init_data || true
+        $VENV_PYTHON -m app.scripts.init_data || true
     fi
 }
 
@@ -115,14 +119,14 @@ main() {
 
     # Development mode
     if [ "${ENVIRONMENT:-development}" = "development" ]; then
-        exec uvicorn app.main:app \
+        exec $VENV_PYTHON -m uvicorn app.main:app \
             --host ${HOST:-0.0.0.0} \
             --port ${PORT:-8000} \
             --reload \
             --log-level debug
     # Production mode
     else
-        exec uvicorn app.main:app \
+        exec $VENV_PYTHON -m uvicorn app.main:app \
             --host ${HOST:-0.0.0.0} \
             --port ${PORT:-8000} \
             --workers ${WORKERS:-4} \

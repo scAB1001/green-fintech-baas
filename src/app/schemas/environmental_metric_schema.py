@@ -14,7 +14,7 @@ class EnvironmentalMetricCreate(EnvironmentalMetricBase):
     company_id: int
 
 
-class EnvironmentalMetric(EnvironmentalMetricBase):
+class EnvironmentalMetricSchema(EnvironmentalMetricBase):
     id: int
     company_id: int
 

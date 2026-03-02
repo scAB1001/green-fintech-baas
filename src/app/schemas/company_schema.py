@@ -29,7 +29,7 @@ class CompanyUpdate(BaseModel):
     location: str | None = None
 
 
-class Company(CompanyBase):
+class CompanySchema(CompanyBase):
     """Schema for returning company data (Response Body)."""
     id: int
 

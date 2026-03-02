@@ -45,11 +45,11 @@ instance/
 *.sqlite3
 
 # Package management
-poetry.lock
-uv.lock
 dist/
 build/
 *.egg-info/
 
-# Local development
-docker-entrypoint.sh  # Excluded because it's copied in Dockerfile
+# Ensure these are NOT ignored if you want to copy them
+!uv.lock
+!pyproject.toml
+!scripts/docker-entrypoint.sh

@@ -1,6 +1,6 @@
 # Dockerfile
 # Stage 1: Builder - using uv for fast dependency installation
-FROM ghcr.io/astral-sh/uv:python3.11-bookworm AS builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm AS builder
 
 # Install system dependencies required for building Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,12 +11,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Force uv to copy binaries instead of symlinking to /root/.local
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never
+
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
+# Use the python provided by the image
+RUN uv venv /app/.venv --python $(which python3)
+
 # Install dependencies into a virtual environment at /app/.venv
-# --frozen: Use lockfile without updating
-# --no-dev: Exclude development dependencies
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the rest of the application
@@ -26,7 +32,7 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime - slim Python image
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,38 +41,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# Create non-root user for security
+# Create non-root user
 RUN addgroup --system --gid 1001 app && \
     adduser --system --uid 1001 --gid 1001 app
 
-# Copy virtual environment from builder
-COPY --from=builder --chown=app:app /app/.venv .venv
+WORKDIR /app
 
-# Copy application code
-COPY --chown=app:app ./src ./src
-COPY --chown=app:app alembic.ini .
-COPY --chown=app:app docker-entrypoint.sh .
+# Copy the venv
+COPY --from=builder /app/.venv /app/.venv
+COPY ./src ./src
+COPY ./alembic ./alembic
+COPY alembic.ini .
+COPY ./scripts/docker-entrypoint.sh .
 
-# Make entrypoint executable
-RUN chmod +x docker-entrypoint.sh
+# Update permissions
+USER root
+RUN chown -R app:app /app && \
+    chmod -R 755 /app/.venv && \
+    chmod +x /app/docker-entrypoint.sh
 
-# Set environment variables
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONPATH="/app/src:$PYTHONPATH" \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONPATH="/app/src" \
+    VIRTUAL_ENV="/app/.venv"
 
-# Switch to non-root user
 USER app
 
-# Expose port
-EXPOSE 8000
-
-# Health check
+# Health check (Note: localhost:8000 inside container)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Entrypoint
-ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "./docker-entrypoint.sh"]
