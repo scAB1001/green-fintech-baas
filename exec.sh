@@ -338,10 +338,10 @@ run_cmd() {
             docker compose up --build -d api && log_success "Container started"
 
             log_info "Waiting for API readiness..."
-            sleep 2
+            sleep 5
 
             log_info "Performing health test with CURL..."
-            curl -X 'GET' 'http://localhost:8080/health' -H 'accept: application/json'
+            curl 'http://localhost:8080/health'
             echo "\n"
             log_success "FastAPI service is running successfully."
             ;;
@@ -432,6 +432,7 @@ run_cmd() {
 
             log_info "Starting Uvicorn..."
             uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+            log_success "Uvicorn started successfully."
             ;;
 
         "docker-stack")
