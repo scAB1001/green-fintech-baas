@@ -1,13 +1,14 @@
 # 🌱 Green FinTech BaaS Simulator API
 
-[![.github/workflows/ci.yml](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yml)
+[![Release](https://github.com/scAB1001/green-fintech-baas/actions/workflows/realease.yml/badge.svg?branch=main)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/realease.yml)
+[![CI](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml)
 
 A sophisticated Banking-as-a-Service (BaaS) simulation platform for green financing and ESG analytics. Built with modern Python tooling and best practices.
 
 ## 🏗️ Architecture
 
 - **API**: FastAPI (async, OpenAPI 3.1)
-- **Database**: PostgreSQL 16+ with SQLAlchemy 2.0 (async)
+- **Database**: PostgreSQL 18+ with SQLAlchemy 2.0 (async)
 - **Caching**: Redis (for score optimisation)
 - **Containerisation**: Docker + Docker Compose
 - **CI/CD**: GitHub Actions with conventional commits
@@ -31,20 +32,9 @@ git clone https://github.com/scAB1001/green-fintech-baas.git
 # Navigate to project directory
 cd green-fintech-baas
 
-# Install dependencies
-poetry install
-
-# Copy environment template
-cp .env.example .env
-
-# Start services
-docker-compose up -d
-
-# Run migrations
-poetry run alembic upgrade head
-
-# Start development server
-poetry run uvicorn src.app.main:app --reload
+# Run the exec script
+chmod +x exec.sh
+./exec.sh
 ```
 
 ## 📚 Documentation
@@ -54,7 +44,8 @@ API documentation is automatically generated at /docs when running.
 ## 🧪 Testing
 
 ```bash
-poetry run pytest
+# Select test options
+./exec.sh
 ```
 
 ## 📦 Deployment

@@ -97,6 +97,9 @@ run_cmd() {
         "init")
             header "INITIALIZING PROJECT"
             # ----- POETRY -----
+            log_info "Installing shell and export plugins..."
+            poetry self add poetry-plugin-shell poetry-plugin-export
+
             log_info "Installing core deps via Poetry..."
             poetry add fastapi httpx pydantic pydantic-settings "sqlalchemy[asyncio]" asyncpg "psycopg[binary]" alembic uvicorn redis && log_success "Poetry core deps added" || log_error "Poetry core failed"
 
