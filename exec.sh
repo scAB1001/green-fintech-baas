@@ -23,8 +23,7 @@ log_warn()    { echo -e " ${YELLOW}${BOLD}⚠${NC} ${YELLOW}$1${NC}"; }
 header()      { echo -e "\n${PURPLE}${BOLD}=========== $1 ===========${NC}"; }
 
 
-# $ docker exec -it green-fintech-cache redis-cli ping
-# PONG
+# EXAMPLE OUTPUT
 # $ docker exec -it green-fintech-cache redis-cli ping
 # PONG
 # $ docker exec -it green-fintech-cache redis-cli
@@ -34,6 +33,12 @@ header()      { echo -e "\n${PURPLE}${BOLD}=========== $1 ===========${NC}"; }
 # (nil)
 # 127.0.0.1:6379> SET company:1 '{"id": 1, "name": "Manual Cache Test", "location": "Redis-Land", "energy_consumption_mwh": 0, "carbon_reduction_pct": 0}'
 # OK
+# docker exec -it green-fintech-cache redis-cli KEYS "*"
+# (empty array)
+# curl -X 'GET' \
+#   'http://localhost:8080/api/v1/companies/1' \
+#   -H 'accept: application/json'
+# {"name":"SolarPlex Ltd","companies_house_id":"SP123456","business_sector":"Renewable Energy","location":"Manchester","id":2}(app-py3.12)
 
 
 # --- Interactive Menu ---
@@ -108,16 +113,13 @@ run_cmd() {
         "init")
             header "INITIALIZING PROJECT DEPENDENCIES"
             log_info "Adding core dependencies..."
-            poetry add fastapi httpx pydantic pydantic-settings "sqlalchemy[asyncio]" asyncpg "psycopg[binary]" alembic
+            poetry add fastapi httpx pydantic pydantic-settings "sqlalchemy[asyncio]" asyncpg "psycopg[binary]" alembic uvicorn redis
 
             log_info "Adding development dependencies..."
             poetry add python-dotenv black isort ruff mypy pre-commit twine --group dev
 
             log_info "Adding testing dependencies..."
             poetry add pytest pytest-cov pytest-asyncio pytest-docker --group test
-
-            log_info "Adding production dependencies..."
-            poetry add uvicorn redis --group prod
 
             log_info "Adding documentation dependencies..."
             poetry add sphinx --group docs
@@ -180,7 +182,6 @@ run_cmd() {
             log_success "Redis is Active"
 
             log_info "Running Alembic Migrations..."
-            # We run upgrade head directly without prompting to automate the setup
             alembic upgrade head
             log_success "Database schema created."
 
@@ -359,10 +360,20 @@ run_cmd() {
 
             log_success "Workspace cleaned."
             ;;
+
         "uv-lock")
             header "UPDATING UV LOCKFILE"
             log_info "Resolving dependencies and updating lockfile..."
             uv lock --upgrade
+
+            log_info "Cache Size"
+            uv cache size --preview-features cache-size -v
+
+            log_info "Cache Clean"
+            uv cache clean -v
+
+            log_info "Cache Prune"
+            uv cache prune -v
 
             log_info "Checking lockfile integrity..."
             uv lock --check
@@ -371,22 +382,9 @@ run_cmd() {
             # uv sync
             log_success "Lockfile updated successfully."
         ;;
+
         *)
-            echo -e "${CYAN}${BOLD}Green FinTech BaaS - CLI Tools${NC}"
-            echo -e "Usage: ./exec.sh [command]\n"
-            echo -e "${BOLD}Available Commands:${NC}"
-            echo -e "  ${BLUE}init${NC}          Install core/dev/test/prod/docs dependencies"
-            echo -e "  ${BLUE}lock${NC}          Regenerate lockfile and show tree"
-            echo -e "  ${BLUE}lint${NC}          Ruff fixes, Black, and Pre-commit"
-            echo -e "  ${BLUE}db-up${NC}         Reset Docker and start Postgres"
-            echo -e "  ${BLUE}db-migrate${NC}    Interactive Alembic revision & upgrade"
-            echo -e "  ${BLUE}db-status${NC}     Full DB health & inspection"
-            echo -e "  ${BLUE}db-sql${NC}        Execute manual SQL queries"
-            echo -e "  ${BLUE}test${NC}          Run pytest (default: not slow)"
-            echo -e "  ${BLUE}test cov${NC}      Run pytest with coverage"
-            echo -e "  ${BLUE}build${NC}         Clean and build artifacts"
-            echo -e "  ${BLUE}clean${NC}         Remove caches and temp files"
-            echo -e "  ${BLUE}publish-test${NC}  Upload to TestPyPI"
+            show_menu
             ;;
     esac
 }

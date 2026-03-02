@@ -32,7 +32,7 @@ COPY . .
 
 # Install the application itself
 RUN uv sync --frozen --no-dev
-RUN uv pip install uvicorn
+# RUN uv pip install uvicorn
 
 # Stage 2: Runtime - slim Python image
 FROM python:3.12-slim-bookworm
