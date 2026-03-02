@@ -261,6 +261,7 @@ show_config() {
 
 # Run a SQL command and return results
 run_sql() {
+    # TODO: Make this a while loop that needs to be exited with 'q'
     local query="$1"
     if [ -z "$query" ]; then
         log_error "Error: No SQL query provided"

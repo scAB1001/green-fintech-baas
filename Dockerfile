@@ -21,18 +21,15 @@ COPY pyproject.toml uv.lock ./
 
 # Use the python provided by the image
 RUN uv venv /app/.venv --python $(which python3)
-RUN uv sync --frozen --no-dev --no-install-project
 
 # Install dependencies into a virtual environment at /app/.venv
-# --frozen: Use lockfile without updating
-# --no-dev: Exclude development dependencies
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the rest of the application
 COPY . .
 
 # Install the application itself
 RUN uv sync --frozen --no-dev
-# RUN uv pip install uvicorn
 
 # Stage 2: Runtime - slim Python image
 FROM python:3.12-slim-bookworm
@@ -57,7 +54,7 @@ COPY ./alembic ./alembic
 COPY alembic.ini .
 COPY ./scripts/docker-entrypoint.sh .
 
-# Fix permissions one last time
+# Update permissions
 USER root
 RUN chown -R app:app /app && \
     chmod -R 755 /app/.venv && \
@@ -69,7 +66,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 USER app
 
-# Health check (Note: localhost:8000 inside container is correct)
+# Health check (Note: localhost:8000 inside container)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
