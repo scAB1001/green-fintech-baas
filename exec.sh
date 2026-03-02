@@ -455,8 +455,11 @@ run_cmd() {
 
             log_info "Building and starting all services..."
             docker compose up --build -d && log_success "Stack running in background"
+            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
+            alembic upgrade head && log_success "Schema up to date"
+            python scripts/seed_db.py && log_success "Seeds planted"
 
-            log_info "Service Status:"
+            log_info "Service Status"
             docker compose logs
             docker compose ps
             ./scripts/db-helper.sh connections
