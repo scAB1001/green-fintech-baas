@@ -125,7 +125,8 @@ start() {
     # Export environment variables for docker-compose
     export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_PORT POSTGRES_INITDB_ARGS
 
-    $COMPOSE_CMD up -d postgres
+    log_info "Spinning up existing Postgres service..."
+    $COMPOSE_CMD up -d postgres && log_success "Postgres service up"
 
     # Wait for PostgreSQL to be ready
     echo

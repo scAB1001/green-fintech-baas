@@ -25,9 +25,7 @@ opt()         { echo -ne "${NC}${BOLD}[${BLUE}$1${NC}${BOLD}]${NC}"; }
 show_menu() {
     clear
 
-    echo -e "${CYAN}${BOLD}🍃 Green FinTech BaaS - Interactive CLI${NC}"
-    echo -e "${YELLOW}Poetry:${NC} $(poetry env info --path 2>/dev/null || echo 'None')"
-    echo -e "${YELLOW}UV Cache:${NC} $(uv cache size --preview-features cache-size 2>/dev/null || echo 'N/A')"
+    echo -e "${CYAN}${BOLD}🍃 Green FinTech BaaS - Interactive CLI${NC}        ${YELLOW}UV Cache:${NC} $(uv cache size --preview-features cache-size)"
     echo -e "-------------------------------------------------------------------------"
 
     echo -e "${BOLD}🛠️  Core Setup & Maintenance${NC}"
@@ -53,9 +51,9 @@ show_menu() {
     echo -e "  19) $(opt "run")         Local Uvicorn Server"
 
     echo -e "\n${BOLD}🌐 Testing, Building and Publishing${NC}"
-    echo -e "  20) $(opt "stack")       Full Docker Stack"
-    echo -e "  21) $(opt "test")        Pytest (Standard)        22) $(opt "cov")         Pytest (XML Coverage)"
-    echo -e "  23) $(opt "build")       Package for [Test]PyPI   24) $(opt "publish")     Publish to [Test]PyPI"
+    echo -e "  20) $(opt "stack")       Full Docker Stack        21) $(opt "down")        Stop Containers"
+    echo -e "  22) $(opt "test")        Pytest (Standard)        23) $(opt "cov")         Pytest (XML Coverage)"
+    echo -e "  24) $(opt "build")       Package for [Test]PyPI   25) $(opt "publish")     Publish to [Test]PyPI"
 
     echo -e "\n   q) ${NC}[${RED}Quit${NC}]"
     echo -ne "\n${YELLOW}Select an option: ${NC}"
@@ -82,10 +80,11 @@ show_menu() {
         18) run_cmd "api-stat" ;;
         19) run_cmd "run" ;;
         20) run_cmd "docker-stack" ;;
-        21) run_cmd "test" ;;
-        22) run_cmd "test" "cov" ;;
-        23) run_cmd "build" ;;
-        24) run_cmd "publish" ;;
+        21) run_cmd "docker-down" ;;
+        22) run_cmd "test" ;;
+        23) run_cmd "test" "cov" ;;
+        24) run_cmd "build" ;;
+        25) run_cmd "publish" ;;
         q)  exit 0 ;;
         *)  log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -104,7 +103,7 @@ run_cmd() {
             poetry add fastapi httpx pydantic pydantic-settings "sqlalchemy[asyncio]" asyncpg "psycopg[binary]" alembic uvicorn redis && log_success "Poetry core deps added" || log_error "Poetry core failed"
 
             log_info "Adding dev dependencies..."
-            poetry add black isort ruff mypy pre-commit pytest pytest-cov pytest-asyncio --group dev && log_success "Dev tools added"
+            poetry add black isort ruff mypy pre-commit pytest pytest-cov pytest-asyncio openpyxl pandas --group dev && log_success "Dev tools added"
 
             log_info "Adding testing dependencies..."
             poetry add pytest pytest-cov pytest-asyncio pytest-docker --group test && log_success "Test tools added"
@@ -405,6 +404,10 @@ run_cmd() {
             rm -rf .pytest_cache .coverage .mypy_cache .ruff_cache dist build *.egg-info
             log_success "Tool caches purged"
 
+            # ----- POETRY -----
+            log_info "Cache Prune"
+            poetry cache clear --all . && log_success "Poetry cache removed"
+
             # ----- UV -----
             # log_info "Cache Size"
             # uv cache size --preview-features cache-size -v
@@ -472,6 +475,22 @@ run_cmd() {
             docker exec -it green-fintech-cache redis-cli KEYS "*"
 
             log_success "Docker stack status check complete."
+            ;;
+
+        "docker-down")
+            header "DOCKER COMPOSE DOWN"
+            log_info "Viewing existing processes..."
+            docker compose ps -a
+
+            log_info "Stopping Containers..."
+            ./scripts/db-helper.sh stop && log_success "Postgress stopped"
+            docker compose down --remove-orphans && log_success "Environment stopped"
+
+            log_info "Service Status"
+            docker compose logs
+            docker compose ps
+
+            log_success "Docker services stopped."
             ;;
 
         "test")

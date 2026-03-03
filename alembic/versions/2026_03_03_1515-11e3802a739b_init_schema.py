@@ -1,8 +1,8 @@
-"""Create companies table
+"""init_schema
 
-Revision ID: 6df59d73aea3
+Revision ID: 11e3802a739b
 Revises:
-Create Date: 2026-02-19 14:19:28.387601
+Create Date: 2026-03-03 15:15:29.207561
 
 """
 from collections.abc import Sequence
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '6df59d73aea3'
+revision: str = '11e3802a739b'
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -31,6 +31,34 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_companies_companies_house_id'), 'companies', ['companies_house_id'], unique=True)
     op.create_index(op.f('ix_companies_id'), 'companies', ['id'], unique=False)
+    op.create_table('national_energy',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('country', sa.String(), nullable=False),
+    sa.Column('energy_type', sa.String(), nullable=False),
+    sa.Column('year', sa.Integer(), nullable=False),
+    sa.Column('energy_consumption', sa.Float(), nullable=True),
+    sa.Column('co2_emission', sa.Float(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_national_energy_country'), 'national_energy', ['country'], unique=False)
+    op.create_index(op.f('ix_national_energy_id'), 'national_energy', ['id'], unique=False)
+    op.create_index(op.f('ix_national_energy_year'), 'national_energy', ['year'], unique=False)
+    op.create_table('regional_emissions',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('local_authority', sa.String(), nullable=False),
+    sa.Column('year', sa.Integer(), nullable=False),
+    sa.Column('industry_total', sa.Float(), nullable=True),
+    sa.Column('commercial_total', sa.Float(), nullable=True),
+    sa.Column('public_sector_total', sa.Float(), nullable=True),
+    sa.Column('domestic_total', sa.Float(), nullable=True),
+    sa.Column('transport_total', sa.Float(), nullable=True),
+    sa.Column('agriculture_total', sa.Float(), nullable=True),
+    sa.Column('grand_total', sa.Float(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_regional_emissions_id'), 'regional_emissions', ['id'], unique=False)
+    op.create_index(op.f('ix_regional_emissions_local_authority'), 'regional_emissions', ['local_authority'], unique=False)
+    op.create_index(op.f('ix_regional_emissions_year'), 'regional_emissions', ['year'], unique=False)
     op.create_table('environmental_metrics',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('company_id', sa.Integer(), nullable=False),
@@ -70,6 +98,14 @@ def downgrade() -> None:
     op.drop_table('loan_simulations')
     op.drop_index(op.f('ix_environmental_metrics_id'), table_name='environmental_metrics')
     op.drop_table('environmental_metrics')
+    op.drop_index(op.f('ix_regional_emissions_year'), table_name='regional_emissions')
+    op.drop_index(op.f('ix_regional_emissions_local_authority'), table_name='regional_emissions')
+    op.drop_index(op.f('ix_regional_emissions_id'), table_name='regional_emissions')
+    op.drop_table('regional_emissions')
+    op.drop_index(op.f('ix_national_energy_year'), table_name='national_energy')
+    op.drop_index(op.f('ix_national_energy_id'), table_name='national_energy')
+    op.drop_index(op.f('ix_national_energy_country'), table_name='national_energy')
+    op.drop_table('national_energy')
     op.drop_index(op.f('ix_companies_id'), table_name='companies')
     op.drop_index(op.f('ix_companies_companies_house_id'), table_name='companies')
     op.drop_table('companies')
