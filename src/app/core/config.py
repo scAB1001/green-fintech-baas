@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_INITDB_ARGS: str = "--auth=scram-sha-256"
 
+    # Redis settings
+    REDIS_PASSWORD: str = "7omaiwo32_K2~aagg+-xcjFmJ@a,32r3G"
+
     @property
     def is_development(self) -> bool:
         return self.ENVIRONMENT == "development"
@@ -48,7 +51,7 @@ class Settings(BaseSettings):
     def REDIS_URL(self) -> str:
         """Build Redis URL from components."""
         host = "green-fintech-cache" if self.is_production else "localhost"
-        return f"redis://{host}:6379"
+        return f"redis://:{self.REDIS_PASSWORD}@{host}:6379"
 
 
 settings = Settings()

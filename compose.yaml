@@ -39,7 +39,7 @@ services:
     env_file:
       - .env
     environment:
-      - ENVIRONMENT=production  # Force production names inside the container
+      - ENVIRONMENT=production  # Force production env inside the container
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-green_fintech}
     ports:
       - "8080:8000"
@@ -49,15 +49,19 @@ services:
   redis:
     image: redis:8-alpine
     container_name: green-fintech-cache
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    ports:
+      - "6379:6379"
     networks:
       - green-fintech-network
+    restart: unless-stopped
 
 networks:
   green-fintech-network:

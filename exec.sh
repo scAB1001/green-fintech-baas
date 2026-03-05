@@ -2,9 +2,6 @@
 
 # --- Configuration & Colors ---
 set -e
-export COMPOSE_DOCKER_CLI_BUILD=1
-export DOCKER_BUILDKIT=1
-COMPOSE_CMD="docker compose"
 
 # Colour Palette
 RED='\033[0;31m'
@@ -16,6 +13,8 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+COMPOSE_CMD="docker compose"
+
 # --- UI Helpers ---
 log_success() { echo -e " ${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"; }
 log_error()   { echo -e " ${RED}${BOLD}✗${NC} ${RED}$1${NC}"; }
@@ -23,6 +22,43 @@ log_info()    { echo -e " ${BLUE}${BOLD}i${NC} ${BLUE}$1${NC}"; }
 log_warn()    { echo -e " ${YELLOW}${BOLD}⚠${NC} ${YELLOW}$1${NC}"; }
 header()      { echo -e "\n${PURPLE}${BOLD}=========== $1 ===========${NC}"; }
 opt()         { echo -ne "${NC}${BOLD}[${BLUE}$1${NC}${BOLD}]${NC}"; }
+
+# Load environment variables from .env
+load_env() {
+    # Docker configurations
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    export DOCKER_BUILDKIT=1
+
+    # VM configurations
+    sudo sysctl vm.swappiness=1
+    sudo sysctl vm.overcommit_memory=1
+
+    if [ -f .env ]; then
+        # Read .env line by line, ignoring comments and empty lines
+        while IFS= read -r line || [ -n "$line" ]; do
+            if [[ ! "$line" =~ ^\s*# ]] && [[ -n "$line" ]]; then
+                clean_line=$(echo "$line" | sed 's/\s*#.*$//' | tr -d '\r')
+                export "$clean_line"
+            fi
+        done < .env
+    else
+        log_warn "No .env file found, using defaults"
+        export POSTGRES_USER="postgres"
+        export POSTGRES_PASSWORD="postgres"
+        export POSTGRES_DB="green_fintech"
+        export POSTGRES_PORT=5432
+        export POSTGRES_INITDB_ARGS="--auth=scram-sha-256"
+    fi
+}
+
+# --- Standard wrappers for Redis commands ---
+_redis() {
+    docker exec -e REDISCLI_AUTH="${REDIS_PASSWORD}" green-fintech-cache redis-cli "$@"
+}
+
+_redis_it() {
+    docker exec -e REDISCLI_AUTH="${REDIS_PASSWORD}" -it green-fintech-cache redis-cli "$@"
+}
 
 # --- Interactive Menu ---
 show_menu() {
@@ -43,30 +79,33 @@ show_menu() {
     echo -e "  05) $(opt "kill")        Kill Ports 8000 & 8080"
 
     echo -e "\n${BOLD}🐘 Postgres Database (Local/Docker)${NC}"
-    echo -e "  06) $(opt "db-up")       Start & Seed PG          07) $(opt "db-stat")     Health & Stats"
-    echo -e "  08) $(opt "db-psql")     Interactive Shell        09) $(opt "db-sql")      Run Custom Query"
-    echo -e "  10) $(opt "db-wipe")     Nuke Volumes & Reset"
+    echo -e "  06) $(opt "db-up")       Start PG Container       07) $(opt "db-init")     Seed PG"
+    echo -e "  08) $(opt "db-stat")     Health & Stats           09) $(opt "db-psql")     Interactive Shell"
+    echo -e "  10) $(opt "db-sql")      Interactive Shell        11) $(opt "db-wipe")     Nuke Volumes & Reset"
 
     echo -e "\n${BOLD}🚀 Redis Cache Service${NC}"
-    echo -e "  11) $(opt "rd-up")       Start Redis Container    12) $(opt "rd-stat")     Ping & Key Check"
-    echo -e "  13) $(opt "rd-cli")      Interactive CLI"
+    echo -e "  12) $(opt "rd-up")       Start Redis Container    13) $(opt "rd-stat")     Ping & Key Check"
+    echo -e "  14) $(opt "rd-cli")      Interactive CLI"
 
     echo -e "\n${BOLD}⚗️  Alembic Migrations${NC}"
-    echo -e "  14) $(opt "mig-new")     Create Autogen Rev       15) $(opt "mig-up")      Preview & Apply"
-    echo -e "  16) $(opt "mig-stat")    History & Rollback"
+    echo -e "  15) $(opt "mig-new")     Create Autogen Rev       16) $(opt "mig-up")      Preview & Apply"
+    echo -e "  17) $(opt "mig-stat")    History & Rollback"
 
     echo -e "\n${BOLD}🌐 FastAPI Service${NC}"
-    echo -e "  17) $(opt "api-up")      Docker API Container     18) $(opt "api-stat")    Health/Docs/Endpoint"
-    echo -e "  19) $(opt "run")         Local Uvicorn Server"
+    echo -e "  18) $(opt "api-up")      Start FastAPI Container  19) $(opt "api-stat")    Health/Docs/Endpoint"
+    echo -e "  20) $(opt "run")         Local Uvicorn Server"
 
     echo -e "\n${BOLD}🌐 Testing, Building and Publishing${NC}"
-    echo -e "  20) $(opt "stack")       Full Docker Stack        21) $(opt "down")        Stop Containers"
-    echo -e "  22) $(opt "test")        Pytest (Standard)        23) $(opt "cov")         Pytest (XML Coverage)"
-    echo -e "  24) $(opt "build")       Package for [Test]PyPI   25) $(opt "publish")     Publish to [Test]PyPI"
+    echo -e "  21) $(opt "stack")       Full Docker Stack        22) $(opt "down")        Stop Containers"
+    echo -e "  23) $(opt "test")        Pytest (Standard)        24) $(opt "cov")         Pytest (XML Coverage)"
+    echo -e "  25) $(opt "build")       Package for [Test]PyPI   26) $(opt "publish")     Publish to [Test]PyPI"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
-    # echo -ne "\n${YELLOW}Select an option: ${NC}"
+
     read -r opt
+
+    # Normalise to lower()
+    opt=$(echo "$opt" | tr '[:upper:]' '[:lower:]')
 
     case $opt in
         1|init)      run_script "init" ;;
@@ -75,25 +114,26 @@ show_menu() {
         4|clean)     run_script "clean" ;;
         5|kill)      run_script "kill-ports" ;;
         6|db-up)     run_script "db-up" ;;
-        7|db-stat)   run_script "db-status" ;;
-        8|db-psql)   run_script "db-psql" ;;
-        9|db-sql)    run_script "db-sql" ;;
-        10|db-wipe)  run_script "db-wipe" ;;
-        11|rd-up)    run_script "rd-up" ;;
-        12|rd-stat)  run_script "rd-stat" ;;
-        13|rd-cli)   run_script "rd-cli" ;;
-        14|mig-new)  run_script "mig-new" ;;
-        15|mig-up)   run_script "mig-up" ;;
-        16|mig-stat) run_script "mig-stat" ;;
-        17|api-up)   run_script "api-up" ;;
-        18|api-stat) run_script "api-stat" ;;
-        19|run)      run_script "run" ;;
-        20|stack)    run_script "docker-stack" ;;
-        21|down)     run_script "docker-down" ;;
-        22|test)     run_script "test" ;;
-        23|cov)      run_script "test" "cov" ;;
-        24|build)    run_script "build" ;;
-        25|publish)  run_script "publish" ;;
+        7|db-init)   run_script "db-init" ;;
+        8|db-stat)   run_script "db-stat" ;;
+        9|db-psql)   run_script "db-psql" ;;
+        10|db-sql)   run_script "db-sql" ;;
+        11|db-wipe)  run_script "db-wipe" ;;
+        12|rd-up)    run_script "rd-up" ;;
+        13|rd-stat)  run_script "rd-stat" ;;
+        14|rd-cli)   run_script "rd-cli" ;;
+        15|mig-new)  run_script "mig-new" ;;
+        16|mig-up)   run_script "mig-up" ;;
+        17|mig-stat) run_script "mig-stat" ;;
+        18|api-up)   run_script "api-up" ;;
+        19|api-stat) run_script "api-stat" ;;
+        20|run)      run_script "run" ;;
+        21|stack)    run_script "docker-stack" ;;
+        22|down)     run_script "docker-down" ;;
+        23|test)     run_script "test" ;;
+        24|cov)      run_script "test" "cov" ;;
+        25|build)    run_script "build" ;;
+        26|publish)  run_script "publish" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
         *)  log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -103,7 +143,7 @@ show_menu() {
 exec_cmd() {
     case "$1" in
         "init")
-            header "INITIALIZING PROJECT"
+            header "INITIALIsING PROJECT"
             log_info "Installing shell and export plugins..."
             poetry self add poetry-plugin-shell poetry-plugin-export
 
@@ -123,19 +163,19 @@ exec_cmd() {
             poetry install --with dev,test,docs && log_success "Dependency groups installed"
 
             log_info "Syncing UV environment..."
-            uv pip install -e . && log_success "UV environment synchronized"
+            uv pip install -e . && log_success "UV environment synchronised"
 
             log_info "Installing pre-commit hooks..."
             pre-commit install && log_success "Git hooks active"
             ;;
 
         "lock")
-            header "LOCKFILE SYNCHRONIZATION"
+            header "LOCKFILE SYNCHRONISATION"
             log_info "Updating Poetry lock..."
-            poetry lock --no-update && log_success "poetry.lock upgraded to LTS"
+            poetry lock --regenerate && log_success "poetry.lock upgraded to LTS"
 
             log_info "Checking lockfile integrity..."
-            poetry check --lock
+            poetry check --lock --strict
 
             log_info "Re-installing dependencies in current environment..."
             poetry install && log_success "Dependencies reinstalled."
@@ -153,22 +193,28 @@ exec_cmd() {
             ;;
 
         "db-up")
-            header "POSTGRES INITIALIZATION"
+            header "POSTGRES SERVICE CREATION"
             log_info "Spinning up Postgres container..."
             $COMPOSE_CMD up --build -d postgres && log_success "Container started"
 
             log_info "Starting postgres database..."
             ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
 
+            exec_cmd "db-init"
+            log_success "Postgres service is running successfully."
+            ;;
+
+        "db-init")
+            header "POSTGRES DB INITIALISATION"
             log_info "Applying migrations..."
             alembic upgrade head && log_success "Schema up to date"
 
             log_info "Seeding data..."
             python scripts/seed_db.py && log_success "Seeds planted"
-            log_success "Postgres service is running successfully."
+            log_success "Postgres db fully initialised."
             ;;
 
-        "db-status")
+        "db-stat")
             header "DATABASE INSPECTION"
             log_info "Starting PostgreSQL Database..."
             ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
@@ -209,34 +255,39 @@ exec_cmd() {
             ;;
 
         "rd-up")
-            header "REDIS MANAGEMENT"
+            header "REDIS SERVICE CREATION"
             log_info "Spinning up Redis container..."
             $COMPOSE_CMD up --build -d cache && log_success "Redis container running"
 
             log_info "Pinging Redis..."
-            # Using exec safely
-            docker exec green-fintech-cache redis-cli ping | grep -q "PONG" && log_success "Redis is alive" || log_error "Redis unreachable"
-
+            _redis ping | grep -q "PONG" && log_success "Redis is alive" || log_error "Redis unreachable"
             log_success "Redis service is running successfully."
             ;;
 
         "rd-stat")
             header "REDIS STATUS"
             log_info "Pinging Redis..."
-            docker exec green-fintech-cache redis-cli ping | grep -q "PONG" && log_success "Redis is alive" || log_error "Redis unreachable"
+            _redis ping | grep "PONG" && log_success "Redis is alive" || log_error "Redis unreachable"
 
-            log_info "Checking for existing keys..."
-            docker exec green-fintech-cache redis-cli DBSIZE
+            log_info "Number of existing keys..."
+            _redis DBSIZE
+
+            log_info "Performing endpoint test with CURL..."
+            curl -X 'GET' 'http://localhost:8080/api/v1/companies/1' -H 'accept: application/json'
+            echo
+
+            log_info "Checking for new keys..."
+            _redis KEYS "*" | grep ":" && log_success "Data present" || log_error "Cache empty"
 
             log_info "Checking container logs..."
-            $COMPOSE_CMD logs --tail=20 cache
+            $COMPOSE_CMD logs --tail=20 redis
             log_success "Redis status check complete."
             ;;
 
         "rd-cli")
             header "REDIS INTERACTIVE SHELL"
             log_info "Connecting to green-fintech-cache..."
-            docker exec -it green-fintech-cache redis-cli
+            _redis_it
             ;;
 
         "mig-new")
@@ -290,7 +341,7 @@ exec_cmd() {
         "api-up")
             exec_cmd "kill-ports"
 
-            header "FASTAPI INITIALIZATION"
+            header "FASTAPI SERVICE CREATION"
             log_info "Spinning up FastAPI container..."
             $COMPOSE_CMD up --build -d api && log_success "Container started"
 
@@ -360,7 +411,7 @@ exec_cmd() {
 
                 log_info "Flushing Redis Cache..."
                 if docker ps --format '{{.Names}}' | grep -q "^green-fintech-cache$"; then
-                    docker exec green-fintech-cache redis-cli FLUSHALL && log_success "Redis cache cleared"
+                    $REDIS_CMD FLUSHALL && log_success "Redis cache cleared"
                 fi
                 log_success "Workspace cleaned."
             fi
@@ -376,6 +427,7 @@ exec_cmd() {
 
         "docker-stack")
             exec_cmd "kill-ports"
+            exec_cmd "lock"
 
             header "DOCKER COMPOSE STACK"
             log_info "Clearing space"
@@ -383,15 +435,20 @@ exec_cmd() {
             docker builder prune -f && log_success "Docker artifacts cleaned"
 
             log_info "Building and starting all services..."
-            $COMPOSE_CMD up --build -d && log_success "Stack running in background"
+            $COMPOSE_CMD up --build -d || { log_error "Stack failed to start."; exit 1; }
+            log_success "Stack running in background"
 
-            log_info "Initializing database..."
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
-            alembic upgrade head && log_success "Schema up to date"
-            python scripts/seed_db.py && log_success "Seeds planted"
+            log_info "Initialising database..."
+            exec_cmd "db-init" || { log_error "Database failed to initialize."; exit 1; }
 
             log_info "Service Status"
             $COMPOSE_CMD ps
+
+            sleep 2 && exec_cmd "db-stat"
+            sleep 2 && exec_cmd "mig-stat"
+            sleep 2 && exec_cmd "api-stat"
+            sleep 2 && exec_cmd "rd-stat"
+
             log_success "Docker stack status check complete."
             ;;
 
@@ -477,17 +534,29 @@ exec_cmd() {
 
 # --- Interactive Wrapper ---
 run_script() {
-    exec_cmd "$@"
+    # Extract arg[0] and set local var to lower()
+    local cmd=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+
+    # Rm the old arg[0]
+    shift
+
+    # Run new cmd, passing along any extra args ($@)
+    exec_cmd "$cmd" "$@"
+
     echo -e "\n${YELLOW}Press enter to return to menu...${NC}"
     read -r
     show_menu
 }
 
 # --- Execution Entry ---
+# Load the environment variables first
+load_env
 if [ -z "$1" ]; then
     show_menu
 else
-    # If a user runs `./exec.sh db-up` directly from the terminal,
-    # it runs the command and exits cleanly without trapping them in the menu
-    exec_cmd "$@"
+    # Usage: `./exec.sh db-up` - exits cleanly without trapping them in the menu
+    # Extract arg[0] and convert to lower()
+    cmd=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    shift
+    exec_cmd "$cmd" "$@"
 fi
