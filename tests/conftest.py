@@ -4,6 +4,7 @@ import json
 import pathlib
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from app.core.redis import get_redis_client
 from app.database import Base
 from app.database.session import get_db
 from app.main import app
@@ -102,13 +104,24 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
     """
     Industry-standard AsyncClient setup.
     Uses ASGITransport to bridge httpx directly to the FastAPI app.
-    Override the app's get_db dependency to use the test session.
+    Override the app's dependencies to use the test session and a mocked cache.
     """
     # 1. Setup Dependency Injection
     def _get_test_db():
         yield db_session
 
+    async def _get_test_cache():
+        # Create a robust mock Redis client
+        mock_cache = AsyncMock()
+        # Ensure .get() behaves asynchronously and returns None (cache miss)
+        mock_cache.get = AsyncMock(return_value=None)
+        mock_cache.setex = AsyncMock()
+        yield mock_cache
+
     app.dependency_overrides[get_db] = _get_test_db
+
+    # CRITICAL: This MUST match the function used in Depends() in companies.py
+    app.dependency_overrides[get_redis_client] = _get_test_cache
 
     # 2. Define the ASGI Transport
     transport = ASGITransport(app=app)
@@ -156,3 +169,28 @@ async def seed_metrics(db_session: AsyncSession, seed_companies):
     db_session.add_all(metrics)
     await db_session.flush()
     return metrics
+
+
+@pytest.fixture
+def mock_oc_response_tesco():
+    """Loads a highly realistic OpenCorporates API payload from fixtures."""
+    fixture_path = pathlib.Path(__file__).parent / \
+        "fixtures" / "opencorporates_tesco.json"
+    with open(fixture_path) as f:
+        return json.load(f)
+
+@pytest.fixture
+def mock_oc_response_shell():
+    """Loads a highly realistic OpenCorporates API payload from fixtures."""
+    fixture_path = pathlib.Path(__file__).parent / \
+        "fixtures" / "opencorporates_shell.json"
+    with open(fixture_path) as f:
+        return json.load(f)
+
+@pytest.fixture
+def mock_oc_response_hsbc():
+    """Loads a highly realistic OpenCorporates API payload from fixtures."""
+    fixture_path = pathlib.Path(__file__).parent / \
+        "fixtures" / "opencorporates_hsbc.json"
+    with open(fixture_path) as f:
+        return json.load(f)
