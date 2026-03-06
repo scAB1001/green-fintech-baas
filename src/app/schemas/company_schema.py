@@ -1,3 +1,4 @@
+# src/app/schemas/company_schema.py
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -14,24 +15,25 @@ class CompanyBase(BaseModel):
     business_sector: str | None = Field(
         None, max_length=100, examples=["Energy"])
     location: str | None = Field(None, max_length=100, examples=["Birmingham"])
+    opencorporates_url: str | None = Field(
+        None, description="Mandatory attribution link")
 
 
-class CompanyCreate(CompanyBase):
-    """Schema for creating a new company (Request Body)."""
-    pass
+class CompanyCreateRequest(BaseModel):
+    """Schema specifically for the OpenCorporates ingestion endpoint."""
+    company_number: CH_ID = Field(...,
+                                  description="The 8-character Companies House ID")
 
 
 class CompanyUpdate(BaseModel):
     """Schema for updating an existing company (All fields optional)."""
-    name: str | None = None
-    companies_house_id: CH_ID | None = None
-    business_sector: str | None = None
-    location: str | None = None
+    name: str | None = Field(None, min_length=1, max_length=255)
+    business_sector: str | None = Field(None, max_length=100)
+    location: str | None = Field(None, max_length=100)
 
 
 class CompanySchema(CompanyBase):
     """Schema for returning company data (Response Body)."""
     id: int
 
-    # Allows Pydantic to read data from the SQLAlchemy model attributes.
     model_config = ConfigDict(from_attributes=True)

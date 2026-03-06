@@ -16,7 +16,6 @@ from app.models.regional_emission import RegionalEmission
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-
 async def seed_companies(db):
     existing = (await db.execute(select(Company).limit(1))).scalars().first()
     if existing:
@@ -105,7 +104,7 @@ async def seed_regional_emissions(db):
         records = df.to_dict(orient="records")
         if records:
             # Chunk the inserts to avoid PostgreSQL's 2^15 or 32767 parameter limit
-            chunk_size = 3000  # slightly smaller chunk due to more columns
+            chunk_size = 2048  # 2^11 slightly smaller chunk due to more columns
             for i in range(0, len(records), chunk_size):
                 chunk = records[i:i + chunk_size]
                 await db.execute(insert(RegionalEmission).values(chunk))
@@ -153,7 +152,7 @@ async def seed_national_energy(db):
         records = df.to_dict(orient="records")
         if records:
             # Chunk the inserts to avoid PostgreSQL's 2^15 or 32767 parameter limit
-            chunk_size = 5000
+            chunk_size = 4096  # 2^12
             for i in range(0, len(records), chunk_size):
                 chunk = records[i:i + chunk_size]
                 await db.execute(insert(NationalEnergy).values(chunk))
