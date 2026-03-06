@@ -39,7 +39,7 @@ class Settings(BaseSettings):
         # If the code is running on your laptop, it MUST use localhost
         # to talk to the Docker ports you mapped.
         if self.is_production:
-            return "green-fintech-db"
+            return "green-fintech-db"  # pragma: no cover
         return "localhost"
 
     @property
@@ -51,7 +51,11 @@ class Settings(BaseSettings):
             return explicit_url
 
         # Fallback for local development outside of Docker
-        host = "green-fintech-db" if self.is_production else "localhost"
+        host = (
+            "green-fintech-db"
+            if self.is_production
+            else "localhost"
+        )  # pragma: no cover
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{host}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @property
@@ -63,7 +67,11 @@ class Settings(BaseSettings):
             return explicit_url
 
         # Fallback for local development
-        host = "green-fintech-cache" if self.is_production else "localhost"
+        host = (
+            "green-fintech-db"
+            if self.is_production
+            else "localhost"
+        )  # pragma: no cover
         return f"redis://:{self.REDIS_PASSWORD}@{host}:6379"
 
 

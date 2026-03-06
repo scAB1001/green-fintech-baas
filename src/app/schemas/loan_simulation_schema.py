@@ -2,6 +2,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# TODO: For non-GBP also
 class LoanSimulationBase(BaseModel):
     """Base fields for a green loan simulation."""
     loan_amount: float = Field(..., gt=0,

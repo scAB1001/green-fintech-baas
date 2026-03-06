@@ -7,25 +7,28 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy import insert, select
 
+from app.core.logger import logger
 from app.database.session import AsyncSessionLocal
 from app.models.company import Company
 from app.models.national_energy import NationalEnergy
 from app.models.regional_emission import RegionalEmission
 
 # Add the src/ directory to the Python path so it finds 'app'
+# This MUST happen before importing any 'app' modules.
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
+
 
 async def seed_companies(db):
     existing = (await db.execute(select(Company).limit(1))).scalars().first()
     if existing:
-        print("⚠️ Companies already seeded, skipping.")
+        logger.info("Companies already seeded, skipping.")
         return
 
     fixture_path = project_root / "tests" / "fixtures" / "companies.json"
 
     if not fixture_path.exists():
-        print(f"❌ Fixture not found at {fixture_path}")
+        logger.error(f"Fixture not found at {fixture_path}")
         return
 
     with open(fixture_path) as f:
@@ -46,27 +49,27 @@ async def seed_companies(db):
 
         await db.commit()
         if companies_added > 0:
-            print(f"✅ Successfully seeded {companies_added} companies.")
+            logger.info(f"Successfully seeded {companies_added} companies.")
         else:
-            print("⚠️ Companies already seeded.")
+            logger.info("Companies already seeded.")
     except Exception as e:
         await db.rollback()
-        print(f"❌ Error seeding companies: {e}")
+        logger.error(f"Error seeding companies: {e}")
 
 
 async def seed_regional_emissions(db):
     existing = (await db.execute(select(RegionalEmission).limit(1))).scalars().first()
     if existing:
-        print("⚠️ Regional emissions already seeded, skipping.")
+        logger.info("Regional emissions already seeded, skipping.")
         return
 
     xlsx_path = project_root / "data" / "2005-23-uk-local-authority-ghg-emissions.xlsx"
 
     if not xlsx_path.exists():
-        print(f"❌ Excel file not found at {xlsx_path}")
+        logger.error(f"Excel file not found at {xlsx_path}")
         return
 
-    print("⏳ Processing Regional GHG Emissions...")
+    logger.info("Processing Regional GHG Emissions...")
     try:
         df = pd.read_excel(
             xlsx_path,
@@ -110,25 +113,25 @@ async def seed_regional_emissions(db):
                 await db.execute(insert(RegionalEmission).values(chunk))
 
             await db.commit()
-            print(
-                f"✅ Successfully seeded {len(records)} regional emission records.")
+            logger.info(
+                f"Successfully seeded {len(records)} regional emission records.")
     except Exception as e:
         await db.rollback()
-        print(f"❌ Error seeding regional emissions: {e}")
+        logger.error(f"Error seeding regional emissions: {e}")
 
 
 async def seed_national_energy(db):
     existing = (await db.execute(select(NationalEnergy).limit(1))).scalars().first()
     if existing:
-        print("⚠️ National energy already seeded, skipping.")
+        logger.info("National energy already seeded, skipping.")
         return
 
     csv_path = project_root / "data" / "energy.csv"
     if not csv_path.exists():
-        print(f"❌ National Energy CSV not found at {csv_path}")
+        logger.error(f"National Energy CSV not found at {csv_path}")
         return
 
-    print("⏳ Processing National Energy Data...")
+    logger.info("Processing National Energy Data...")
     try:
         df = pd.read_csv(csv_path)
 
@@ -158,11 +161,11 @@ async def seed_national_energy(db):
                 await db.execute(insert(NationalEnergy).values(chunk))
 
             await db.commit()
-            print(
-                f"✅ Successfully seeded {len(records)} national energy records.")
+            logger.info(
+                f"Successfully seeded {len(records)} national energy records.")
     except Exception as e:
         await db.rollback()
-        print(f"❌ Error seeding national energy: {e}")
+        logger.error(f"Error seeding national energy: {e}")
 
 
 async def run_all_seeders():
@@ -172,7 +175,7 @@ async def run_all_seeders():
         await seed_national_energy(db)
 
 if __name__ == "__main__":
-    print("🌱 Starting database seed...")
+    logger.info("Starting database seed...")
     # Because this is a standard python script (not FastAPI),
     # we have to manually start the async event loop
     asyncio.run(run_all_seeders())
