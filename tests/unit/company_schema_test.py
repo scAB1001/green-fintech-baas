@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.company_schema import CompanyCreate
+from app.schemas.company_schema import CompanyCreateRequest
 
 
 @pytest.mark.unit
@@ -25,7 +25,7 @@ def test_company_create_invalid_id():
         "companies_house_id": "SHORT",  # Only 5 chars
     }
     with pytest.raises(ValidationError):
-        CompanyCreate(**payload)
+        CompanyCreateRequest(**payload)
 
 
 @pytest.mark.unit
