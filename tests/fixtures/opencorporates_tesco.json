@@ -1,0 +1,25 @@
+{
+  "results": {
+    "company": {
+      "name": "TESCO PLC",
+      "company_number": "00445790",
+      "business_sector": "Retail sale in non-specialised stores with food, beverages or tobacco predominating",
+      "jurisdiction_code": "gb",
+      "company_type": "Public Limited Company",
+      "current_status": "Active",
+      "incorporation_date": "1947-11-27",
+      "registered_address": {
+        "locality": "Welwyn Garden City",
+        "country": "United Kingdom"
+      },
+      "industry_codes": [
+        {
+          "industry_code": {
+            "description": "Retail sale in non-specialised stores with food, beverages or tobacco predominating"
+          }
+        }
+      ],
+      "opencorporates_url": "https://opencorporates.com/companies/gb/00445790"
+    }
+  }
+}

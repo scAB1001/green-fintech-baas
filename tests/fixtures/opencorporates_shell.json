@@ -1,0 +1,25 @@
+{
+  "results": {
+    "company": {
+      "name": "SHELL PLC",
+      "company_number": "04366849",
+      "business_sector": "Fossil Fuels",
+      "jurisdiction_code": "gb",
+      "company_type": "Public Limited Company",
+      "current_status": "Active",
+      "incorporation_date": "2002-02-05",
+      "registered_address": {
+        "locality": "London",
+        "country": "United Kingdom"
+      },
+      "industry_codes": [
+        {
+          "industry_code": {
+            "description": "Fossil Fuels"
+          }
+        }
+      ],
+      "opencorporates_url": "https://opencorporates.com/companies/gb/04366849"
+    }
+  }
+}

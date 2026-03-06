@@ -1,0 +1,30 @@
+{
+  "results": {
+    "company": {
+      "name": "HSBC UK BANK PLC",
+      "company_number": "09928412",
+      "business_sector": "Banks",
+      "jurisdiction_code": "gb",
+      "company_type": "Public Limited Company",
+      "current_status": "Active",
+      "incorporation_date": "2015-12-23",
+      "registered_address": {
+        "locality": "Birmingham",
+        "country": "United Kingdom"
+      },
+      "industry_codes": [
+        {
+          "industry_code": {
+            "description": "Banks"
+          }
+        },
+        {
+          "industry_code": {
+            "description": "Other monetary intermediation"
+          }
+        }
+      ],
+      "opencorporates_url": "https://opencorporates.com/companies/gb/09928412"
+    }
+  }
+}
