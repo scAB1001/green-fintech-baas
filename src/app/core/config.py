@@ -44,12 +44,25 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
-        """Build database URL from components."""
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.db_host}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        """Build database URL from components or use environment variable."""
+        import os
+        explicit_url = os.environ.get("DATABASE_URL")
+        if explicit_url:
+            return explicit_url
+
+        # Fallback for local development outside of Docker
+        host = "green-fintech-db" if self.is_production else "localhost"
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{host}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @property
     def REDIS_URL(self) -> str:
-        """Build Redis URL from components."""
+        """Build Redis URL from components or use environment variable."""
+        import os
+        explicit_url = os.environ.get("REDIS_URL")
+        if explicit_url:
+            return explicit_url
+
+        # Fallback for local development
         host = "green-fintech-cache" if self.is_production else "localhost"
         return f"redis://:{self.REDIS_PASSWORD}@{host}:6379"
 
