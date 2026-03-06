@@ -74,7 +74,7 @@ show_menu() {
     echo -e "-------------------------------------------------------------------------------------"
 
     echo -e "${BOLD}🛠️  Core Setup & Maintenance${NC}"
-    echo -e "  01) $(opt "init")        Full Install (Both)      02) $(opt "lock")        Regen Lockfiles"
+    echo -e "  01) $(opt "init")        Full Install (UV)        02) $(opt "lock")        Regen Lockfiles"
     echo -e "  03) $(opt "lint")        Ruff/Black/Mypy          04) $(opt "clean")       Deep Workspace Purge"
     echo -e "  05) $(opt "kill")        Kill Ports 8000 & 8080"
 
@@ -87,7 +87,7 @@ show_menu() {
     echo -e "  12) $(opt "rd-up")       Start Redis Container    13) $(opt "rd-stat")     Ping & Key Check"
     echo -e "  14) $(opt "rd-cli")      Interactive CLI"
 
-    echo -e "\n${BOLD}⚗️  Alembic Migrations${NC}"
+    echo -e "\n${BOLD}⚗️  uv run Alembic Migrations${NC}"
     echo -e "  15) $(opt "mig-new")     Create Autogen Rev       16) $(opt "mig-up")      Preview & Apply"
     echo -e "  17) $(opt "mig-stat")    History & Rollback"
 
@@ -143,51 +143,25 @@ show_menu() {
 exec_cmd() {
     case "$1" in
         "init")
-            header "INITIALIsING PROJECT"
-            log_info "Installing shell and export plugins..."
-            poetry self add poetry-plugin-shell poetry-plugin-export
-
-            log_info "Installing core deps via Poetry..."
-            poetry add fastapi httpx pydantic pydantic-settings "sqlalchemy[asyncio]" asyncpg "psycopg[binary]" alembic uvicorn redis && log_success "Poetry core deps added" || log_error "Poetry core failed"
-
-            log_info "Adding dev dependencies..."
-            poetry add black isort ruff mypy pre-commit pytest pytest-cov pytest-asyncio openpyxl pandas --group dev && log_success "Dev tools added"
-
-            log_info "Adding testing dependencies..."
-            poetry add pytest pytest-cov pytest-asyncio pytest-docker --group test && log_success "Test tools added"
-
-            log_info "Adding documentation dependencies..."
-            poetry add sphinx --group docs && log_success "Doc tools added"
-
-            log_info "Installing dependencies in current environment..."
-            poetry install --with dev,test,docs && log_success "Dependency groups installed"
-
-            log_info "Syncing UV environment..."
-            uv pip install -e . && log_success "UV environment synchronised"
+            header "INITIALISING PROJECT"
+            # uv reads pyproject.toml, creates the venv, and installs everything
+            log_info "Syncing UV environment and installing all groups..."
+            uv sync --all-groups && log_success "UV environment synchronised"
 
             log_info "Installing pre-commit hooks..."
-            pre-commit install && log_success "Git hooks active"
+            uv run pre-commit install && log_success "Git hooks active"
             ;;
 
         "lock")
             header "LOCKFILE SYNCHRONISATION"
-            log_info "Updating Poetry lock..."
-            poetry lock --regenerate && log_success "poetry.lock upgraded to LTS"
-
-            log_info "Checking lockfile integrity..."
-            poetry check --lock --strict
-
-            log_info "Re-installing dependencies in current environment..."
-            poetry install && log_success "Dependencies reinstalled."
-
-            log_info "Displaying dependency tree..."
-            poetry show --tree
-
             log_info "Updating UV lock..."
             uv lock --upgrade && log_success "uv.lock upgraded to LTS"
 
             log_info "Checking lockfile integrity..."
             uv lock --check
+
+            log_info "Displaying dependency tree..."
+            uv tree
 
             log_success "Lockfiles updated successfully."
             ;;
@@ -207,7 +181,7 @@ exec_cmd() {
         "db-init")
             header "POSTGRES DB INITIALISATION"
             log_info "Applying migrations..."
-            alembic upgrade head && log_success "Schema up to date"
+            uv run alembic upgrade head && log_success "Schema up to date"
 
             log_info "Seeding data..."
             python scripts/seed_db.py && log_success "Seeds planted"
@@ -298,7 +272,7 @@ exec_cmd() {
             log_info "Generating migration script..."
             read -p "Enter migration message: " msg
             if [ -n "$msg" ]; then
-                alembic revision --autogenerate -m "$msg" && log_success "Migration created in ./alembic/versions"
+                uv run alembic revision --autogenerate -m "$msg" && log_success "Migration created in ./alembic/versions"
             else
                 log_error "Migration message cannot be empty."
             fi
@@ -307,13 +281,13 @@ exec_cmd() {
         "mig-up")
             header "UPGRADING SCHEMA"
             log_info "Readying to apply..."
-            read -p "Apply migration to database? (y/n) " apply
+            read -p "Apply migration to database? (y/n): " apply
             if [[ "$apply" == "y" || "$apply" == "Y" ]]; then
                 read -p "Enter migration tag (optional): " tag
                 if [ -n "$tag" ]; then
-                    alembic upgrade head --tag "$tag"
+                    uv run alembic upgrade head --tag "$tag"
                 else
-                    alembic upgrade head
+                    uv run alembic upgrade head
                 fi
                 log_success "Migration applied successfully."
             else
@@ -324,15 +298,15 @@ exec_cmd() {
         "mig-stat")
             header "MIGRATION STATUS"
             log_info "Checking migration history..."
-            alembic history --verbose | head -n 15
+            uv run alembic history --verbose | head -n 15
 
             log_info "Rolling back to specified revision..."
             read -p "How many revisions to rollback? (Enter number or 'n' to skip): " rev
             if [[ "$rev" =~ ^[0-9]+$ ]]; then
                 log_warn "Rolling back -$rev revision(s)..."
-                alembic downgrade "-$rev" && log_success "Rollback complete"
+                uv run alembic downgrade "-$rev" && log_success "Rollback complete"
             else
-                log_info "Skipping rollback."
+                log_info "Skipping rollback..."
             fi
 
             log_success "Migration status check complete."
@@ -387,7 +361,7 @@ exec_cmd() {
         "clean")
             header "WORKSPACE PURGE"
             log_warn "You are about to delete all cached files, build artifacts, and docker images."
-            read -p "Proceed? (y/n) " proceed
+            read -p "Proceed? (y/n): " proceed
             if [[ "$proceed" == "y" || "$proceed" == "Y" ]]; then
                 log_info "Cleaning Python caches..."
                 find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -396,10 +370,7 @@ exec_cmd() {
 
                 log_info "Cleaning tool artifacts..."
                 rm -rf .pytest_cache .coverage .mypy_cache .ruff_cache dist build *.egg-info 2>/dev/null || true
-                log_success "Tool caches purged"
-
-                log_info "Cache Prune (Poetry)"
-                poetry cache clear --all . -n 2>/dev/null || true && log_success "Poetry cache removed"
+                log_success "Tool caches and environments purged"
 
                 if command -v uv >/dev/null 2>&1; then
                     log_info "Cache Prune (UV)"
@@ -422,20 +393,35 @@ exec_cmd() {
 
             header "LOCAL FASTAPI SERVER"
             log_info "Starting Uvicorn..."
-            uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+            uv run uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
             ;;
 
         "docker-stack")
-            exec_cmd "kill-ports"
-            exec_cmd "lock"
+            read -p "Would you like to run 'kill-ports'? (y/n): " kill_ports
+            if [[ "$kill_ports" == "y" || "$kill_ports" == "Y" ]]; then
+                exec_cmd "kill-ports"
+            fi
+            read -p "Would you like to run 'lock'? (y/n): " lock
+            if [[ "$lock" == "y" || "$lock" == "Y" ]]; then
+                exec_cmd "lock"
+            fi
 
             header "DOCKER COMPOSE STACK"
-            log_info "Clearing space"
+            log_info "Clearing space..."
             $COMPOSE_CMD down -v && log_success "Environment wiped"
-            docker builder prune -f && log_success "Docker artifacts cleaned"
+
+            read -p "Would you like to clear Docker artifacts? (y/n): " prune
+            if [[ "$prune" == "y" || "$prun" == "Y" ]]; then
+                docker builder prune -f && log_success "Docker artifacts cleaned"
+            fi
 
             log_info "Building and starting all services..."
-            $COMPOSE_CMD up --build -d || { log_error "Stack failed to start."; exit 1; }
+            read -p "Would you like to builder the container from scratch? (y/n): " scratch
+            if [[ "$scratch" == "y" || "$scratch" == "Y" ]]; then
+                $COMPOSE_CMD up --build -d || { log_error "Stack failed to start."; exit 1; }
+            else
+                $COMPOSE_CMD up -d || { log_error "Stack failed to start."; exit 1; }
+            fi
             log_success "Stack running in background"
 
             log_info "Initialising database..."
@@ -465,15 +451,15 @@ exec_cmd() {
             header "RUNNING TEST SUITE"
             if [ "$2" == "cov" ]; then
                 log_info "Running tests with coverage report..."
-                pytest --cov=src --cov-report=xml && log_success "Coverage report generated in coverage.xml"
+                uv run pytest --cov=src --cov-report=xml && log_success "Coverage report generated in coverage.xml"
             else
                 log_info "Running tests (standard mode)..."
-                pytest -v && log_success "Tests passed" || log_error "Tests failed"
+                uv run pytest -v && log_success "Tests passed" || log_error "Tests failed"
             fi
 
             # DEBUG: pytest -v --log-cli-level=DEBUG
             # TODO: Add marker test options for "slow", "db", "api", etc. (pytest -m integration)
-            # read -p "View test coverage report? (y/n) " view_cov
+            # read -p "View test coverage report? (y/n): " view_cov
             # if [[ "$view_cov" == "y" ]]; then
             #     pytest --cov=src --cov-report=html
             #     log_info "Opening coverage report in browser..."
@@ -481,7 +467,7 @@ exec_cmd() {
             # fi
 
             # TODO: Add further specific test file or directory options (pytest -s tests/db_test.py)
-            # read -p "Run specific test file or directory? (y/n) " run_specific
+            # read -p "Run specific test file or directory? (y/n): " run_specific
             # if [[ "$run_specific" == "y" ]]; then
             #     read -p "Enter test file or directory within tests/ (e.g., db_test.py): " test_path
             #     pytest -v "$test_path"
@@ -491,19 +477,19 @@ exec_cmd() {
         "lint")
             header "LINTING & FORMATTING"
             log_info "Updating pre-commit hooks..."
-            pre-commit autoupdate && log_success "Pre-commit hooks updated"
+            uv run pre-commit autoupdate && log_success "Pre-commit hooks updated"
 
             log_info "Running Ruff (Fix)..."
-            ruff check --fix . && log_success "Ruff finished"
+            uv run ruff check --fix . && log_success "Ruff finished"
 
             log_info "Running Black..."
-            black . && log_success "Black finished"
+            uv run black . && log_success "Black finished"
 
             log_info "Running Mypy..."
-            mypy . && log_success "Mypy checks passed"
+            uv run mypy . && log_success "Mypy checks passed"
 
             log_info "Running Pre-commit hooks..."
-            pre-commit run --all-files
+            uv run pre-commit run --all-files
             log_success "Linting complete."
             ;;
 
@@ -512,18 +498,19 @@ exec_cmd() {
             log_info "Cleaning old build artifacts..."
             rm -rf dist/ build/ *.egg-info
 
-            log_info "Building wheel and sdist with Poetry..."
-            poetry build && log_success "Build artifacts created in dist/"
+            log_info "Building wheel and sdist with UV..."
+            uv build && log_success "Build artifacts created in dist/"
             ;;
 
         "publish")
             header "PUBLISHING TO TEST PYPI"
-            log_info "Configuring repository..."
-            poetry config repositories.testpypi https://test.pypi.org/legacy/ || true
+            # log_info "Configuring repository..."
+            # config repositories.testpypi https://test.pypi.org/legacy/ || true
 
-            log_info "Uploading package..."
-            # Note: This will prompt for username/password if not configured via env vars
-            twine upload --repository testpypi dist/* --verbose
+            log_info "Uploading package using Twine via UV..."
+            # Twine reads TWINE_USERNAME and TWINE_PASSWORD from your environment (.env)
+            # If not set, it will prompt you securely in the terminal.
+            uv run twine upload --repository testpypi dist/* --verbose
             ;;
 
         *)
