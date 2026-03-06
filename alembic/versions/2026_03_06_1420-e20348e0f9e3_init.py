@@ -1,8 +1,8 @@
-"""init_schema
+"""init
 
-Revision ID: 11e3802a739b
+Revision ID: e20348e0f9e3
 Revises:
-Create Date: 2026-03-03 15:15:29.207561
+Create Date: 2026-03-06 14:20:21.398282
 
 """
 from collections.abc import Sequence
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '11e3802a739b'
+revision: str = 'e20348e0f9e3'
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -27,17 +27,18 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('business_sector', sa.String(length=100), nullable=False),
     sa.Column('location', sa.String(length=100), nullable=False),
+    sa.Column('opencorporates_url', sa.String(length=255), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_companies_companies_house_id'), 'companies', ['companies_house_id'], unique=True)
     op.create_index(op.f('ix_companies_id'), 'companies', ['id'], unique=False)
     op.create_table('national_energy',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('country', sa.String(), nullable=False),
-    sa.Column('energy_type', sa.String(), nullable=False),
+    sa.Column('country', sa.String(length=255), nullable=False),
+    sa.Column('energy_type', sa.String(length=100), nullable=False),
     sa.Column('year', sa.Integer(), nullable=False),
-    sa.Column('energy_consumption', sa.Float(), nullable=True),
-    sa.Column('co2_emission', sa.Float(), nullable=True),
+    sa.Column('energy_consumption', sa.Float(), nullable=False),
+    sa.Column('co2_emission', sa.Float(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_national_energy_country'), 'national_energy', ['country'], unique=False)
@@ -45,15 +46,15 @@ def upgrade() -> None:
     op.create_index(op.f('ix_national_energy_year'), 'national_energy', ['year'], unique=False)
     op.create_table('regional_emissions',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('local_authority', sa.String(), nullable=False),
+    sa.Column('local_authority', sa.String(length=255), nullable=False),
     sa.Column('year', sa.Integer(), nullable=False),
-    sa.Column('industry_total', sa.Float(), nullable=True),
-    sa.Column('commercial_total', sa.Float(), nullable=True),
-    sa.Column('public_sector_total', sa.Float(), nullable=True),
-    sa.Column('domestic_total', sa.Float(), nullable=True),
-    sa.Column('transport_total', sa.Float(), nullable=True),
-    sa.Column('agriculture_total', sa.Float(), nullable=True),
-    sa.Column('grand_total', sa.Float(), nullable=True),
+    sa.Column('industry_total', sa.Float(), nullable=False),
+    sa.Column('commercial_total', sa.Float(), nullable=False),
+    sa.Column('public_sector_total', sa.Float(), nullable=False),
+    sa.Column('domestic_total', sa.Float(), nullable=False),
+    sa.Column('transport_total', sa.Float(), nullable=False),
+    sa.Column('agriculture_total', sa.Float(), nullable=False),
+    sa.Column('grand_total', sa.Float(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_regional_emissions_id'), 'regional_emissions', ['id'], unique=False)
@@ -63,25 +64,24 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('company_id', sa.Integer(), nullable=False),
     sa.Column('reporting_year', sa.Integer(), nullable=False),
-    sa.Column('energy_consumption_mwh', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('carbon_emissions_tco2e', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('water_usage_m3', sa.Numeric(precision=10, scale=2), nullable=True),
-    sa.Column('waste_generated_tonnes', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('energy_consumption_mwh', sa.Float(), nullable=False),
+    sa.Column('carbon_emissions_tco2e', sa.Float(), nullable=False),
+    sa.Column('water_usage_m3', sa.Float(), nullable=True),
+    sa.Column('waste_generated_tonnes', sa.Float(), nullable=True),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('company_id', 'reporting_year', name='uq_company_year')
     )
     op.create_index(op.f('ix_environmental_metrics_id'), 'environmental_metrics', ['id'], unique=False)
     op.create_table('loan_simulations',
-    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('company_id', sa.Integer(), nullable=False),
-    sa.Column('loan_amount_gbp', sa.Numeric(precision=12, scale=2), nullable=False),
-    sa.Column('loan_term_years', sa.Integer(), nullable=False),
-    sa.Column('base_interest_rate', sa.Numeric(precision=4, scale=3), nullable=False),
-    sa.Column('green_score', sa.Numeric(precision=5, scale=2), nullable=False),
-    sa.Column('green_discount', sa.Numeric(precision=4, scale=3), nullable=False),
-    sa.Column('simulated_final_rate', sa.Numeric(precision=4, scale=3), nullable=False),
-    sa.Column('estimated_co2_savings_tco2e', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('loan_amount', sa.Float(), nullable=False),
+    sa.Column('term_months', sa.Integer(), nullable=False),
+    sa.Column('base_rate', sa.Float(), nullable=False),
+    sa.Column('applied_rate', sa.Float(), nullable=False),
+    sa.Column('esg_score', sa.Float(), nullable=False),
+    sa.Column('estimated_carbon_savings', sa.Float(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('simulation_parameters', sa.String(), nullable=True),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),

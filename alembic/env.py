@@ -3,23 +3,27 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-# 1. THIS MUST HAPPEN FIRST
+# 1. FIRST
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from sqlalchemy import engine_from_config, pool
 
-# 3. CRITICAL FIX: Import the models package so they register with Base.metadata
 from alembic import context
 
-# 2. Now import your app modules
+# 2. SECOND
 from app.core.config import settings
 from app.database.session import Base
+
+# 3. THIRD
+# from app.models import Company, EnvironmentalMetric,
+# LoanSimulation, NationalEnergy, RegionalEmission
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Convert asyncpg URL to standard sync URL for Alembic
 sync_url = str(settings.DATABASE_URL).replace("+asyncpg", "")
 config.set_main_option("sqlalchemy.url", sync_url)
 
