@@ -17,10 +17,10 @@ A sophisticated Banking-as-a-Service (BaaS) simulation platform for green financ
 ## 📋 Prerequisites
 
 - Python 3.12+
-- Poetry
+- uv (Astral)
 - Docker version 29.2.1, build a5c7197 & Docker Compose v5.0.2
-- PostgreSQL 18+ (or Docker)
-- Redis 7+ (optional, Stage 2)
+- PostgrSQL 18+ (or Docker)
+- Redis 8+ (optional, Stage 2)
 
 ## 🚀 Quick Start
 
@@ -45,7 +45,8 @@ API documentation is automatically generated at /docs when running.
 
 ```bash
 # Select test options
-./exec.sh
+./exec.sh test
+./exec.sh test cov
 ```
 
 ## 📦 Deployment

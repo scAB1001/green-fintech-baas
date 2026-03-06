@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Colors
+# --- Configuration & Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -10,6 +10,10 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+DB_CONTAINER="green-fintech-db"
+COMPOSE_CMD="docker compose"
+
+# --- UI Helpers ---
 log_warn()      { echo -e " ${YELLOW}${BOLD}⚠${YELLOW} $1${NC}"; }
 log_serious()   { echo -e " ${ORANGE}${BOLD}⚠${ORANGE} $1${NC}"; }
 log_error()     { echo -e " ${RED}${BOLD}✗${RED} $1${NC}"; }
@@ -17,13 +21,13 @@ log_success()   { echo -e " ${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"; }
 log_data()      { echo -e " ${NC}${BOLD}  >${NC} $1${NC}"; }
 log_info()      { echo -e " ${BLUE}${BOLD}i${BLUE} $1${NC}"; }
 
-# Load environment variables from .env
+# --- Environment Setup ---
 load_env() {
     if [ -f .env ]; then
         # Read .env line by line, ignoring comments and empty lines
         while IFS= read -r line || [ -n "$line" ]; do
             if [[ ! "$line" =~ ^\s*# ]] && [[ -n "$line" ]]; then
-                clean_line=$(echo "$line" | sed 's/\s*#.*$//')
+                clean_line=$(echo "$line" | sed 's/\s*#.*$//' | tr -d '\r')
                 export "$clean_line"
             fi
         done < .env
@@ -35,6 +39,9 @@ load_env() {
         export POSTGRES_PORT=5432
         export POSTGRES_INITDB_ARGS="--auth=scram-sha-256"
     fi
+
+    # Exported globally for external tools if needed
+    export DATABASE_URL="postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}"
 }
 
 show_env() {
@@ -46,18 +53,23 @@ show_env() {
     log_data "Init Args: ${POSTGRES_INITDB_ARGS}"
 }
 
-export DATABASE_URL="postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}"
-COMPOSE_CMD="docker compose"
-
-# Base psql execution wrapper to keep things DRY
-_psql() {
-    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" green-fintech-db \
-        psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" "$@"
+# --- Core command wrappers ---
+_exec_db() {
+    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "$@"
 }
 
+_psql() {
+    _exec_db "${DB_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" "$@"
+}
+
+_is_ready() {
+    docker exec "${DB_CONTAINER}" pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1
+}
+
+# --- Service Management ---
 check_postgres() {
-    if docker ps --format '{{.Names}}' | grep -q "^green-fintech-db$"; then
-        if docker exec green-fintech-db pg_isready -U ${POSTGRES_USER} >/dev/null 2>&1; then
+    if docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
+        if _is_ready; then
             log_success "PostgreSQL is running and accepting connections"
             return 0
         else
@@ -72,12 +84,11 @@ check_postgres() {
 
 start() {
     log_warn "Starting PostgreSQL with SCRAM-SHA-256 authentication..."
-    export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_PORT POSTGRES_INITDB_ARGS
     $COMPOSE_CMD up -d postgres && log_success "Postgres service up"
 
     log_warn "Waiting for PostgreSQL to be ready..."
     for i in {1..30}; do
-        if docker exec green-fintech-db pg_isready -U ${POSTGRES_USER} >/dev/null 2>&1; then
+        if _is_ready; then
             log_success "PostgreSQL is ready"
             return 0
         fi
@@ -105,19 +116,20 @@ reset() {
     fi
 }
 
+# --- Database Operations ---
 psql() {
-    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" -it green-fintech-db psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+    _exec_db -it "${DB_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
 }
 
 logs() {
-    docker logs -f green-fintech-db
+    docker logs -f "${DB_CONTAINER}"
 }
 
 backup() {
     mkdir -p backups
     local backup_file="backups/backup_$(date +%Y%m%d_%H%M%S).sql"
-    log_warn "Creating backup: $backup_file"
-    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" green-fintech-db pg_dump -U ${POSTGRES_USER} ${POSTGRES_DB} > "$backup_file"
+    log_warn "Creating backup: $backup_file..."
+    _exec_db "${DB_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "$backup_file"
     log_success "Backup created: $backup_file ($(du -h "$backup_file" | cut -f1))"
 }
 
@@ -131,11 +143,12 @@ restore() {
     read -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        cat "$backup_file" | docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" -i green-fintech-db psql -U ${POSTGRES_USER} ${POSTGRES_DB}
+        cat "$backup_file" | _exec_db -i "${DB_CONTAINER}" psql -U "${POSTGRES_USER}" "${POSTGRES_DB}"
         log_success "Restore complete"
     fi
 }
 
+# --- Diagnostics & Queries ---
 show_config() {
     show_env
     if check_postgres >/dev/null 2>&1; then
@@ -148,13 +161,13 @@ show_config() {
 run_sql() {
     local query="$1"
 
-    # If a query is provided directly as an argument, run it once and exit
+    # Single execution
     if [ -n "$query" ]; then
         _psql -t -c "$query" 2>/dev/null || log_error "Error running SQL command"
         return
     fi
 
-    # If no query provided, launch an interactive loop
+    # Interactive mode
     log_info "Interactive SQL Mode. Type 'q' or 'quit' to exit."
     while true; do
         read -p "SQL> " query
@@ -194,7 +207,7 @@ test_access() {
     fi
 
     echo -n "  Method 2 (URI string): "
-    if docker exec green-fintech-db psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
+    if _exec_db "${DB_CONTAINER}" psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
         log_success "Success"
     else
         log_error "Failed"
@@ -209,6 +222,7 @@ inspect_db() {
     table_sizes
 }
 
+# --- Execution Entry ---
 main() {
     load_env
 
