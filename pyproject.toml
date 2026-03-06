@@ -94,6 +94,35 @@ markers = [
     "smoke: Quick smoke tests for CI",
 ]
 
+[tool.coverage.run]
+# Measure branch coverage (did an 'if' statement evaluate to both True and False?)
+branch = true
+# Only measure the actual application code
+source = ["src/app"]
+# Explicitly omit tests and database migrations from coverage metrics
+omit = [
+    "tests/*",
+    "alembic/*",
+    # Usually omitted as it's hard to test DB connection teardowns
+    "src/app/database/session.py"
+]
+
+[tool.coverage.report]
+# Always show line numbers that are missing coverage in the terminal
+show_missing = true
+# Fail CI/CD pipeline if coverage < 80% (industry standard)
+fail_under = 80
+# Ignore specific lines that shouldn't be tested
+exclude_also = [
+    "def __repr__",              # Ignore SQLAlchemy model debug representations
+    "if TYPE_CHECKING:",         # Ignore type-hinting imports
+    "raise NotImplementedError", # Ignore abstract base classes
+    "if __name__ == .__main__.:",# Ignore standard script execution blocks
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "B", "F401"]
 "alembic/versions/*.py" = ["E501", "D100"]
