@@ -1,3 +1,4 @@
+# src/app/models/company.py
 """Company model for financial entities."""
 from typing import TYPE_CHECKING
 
@@ -6,7 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
-# This prevent circular imports at runtime
 if TYPE_CHECKING:
     from .environmental_metric import EnvironmentalMetric
     from .loan_simulation import LoanSimulation
@@ -14,19 +14,16 @@ if TYPE_CHECKING:
 
 class Company(Base):
     """Represents a company/business entity."""
-
     __tablename__ = "companies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     companies_house_id: Mapped[str] = mapped_column(
-        String(8),
-        unique=True,
-        index=True,
-        nullable=False
-    )
+        String(8), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_sector: Mapped[str] = mapped_column(String(100))
     location: Mapped[str] = mapped_column(String(100))
+    opencorporates_url: Mapped[str | None] = mapped_column(
+        String(255), nullable=True)
 
     environmental_metrics: Mapped[list["EnvironmentalMetric"]] = relationship(
         back_populates="company", cascade="all, delete-orphan"
@@ -36,4 +33,5 @@ class Company(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Company(id={self.id}, name='{self.name}')>"
+        return f"<Company(id={self.id}, name='{self.name}', \
+            ch_id='{self.companies_house_id}')>"

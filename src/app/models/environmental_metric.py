@@ -1,10 +1,10 @@
-
-from sqlalchemy import ForeignKey, Integer, Numeric, UniqueConstraint
+# src/app/models/environmental_metric.py
+from sqlalchemy import Float, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
-from . import Company  # Import the Company model for the relationship
+from . import Company
 
 
 class EnvironmentalMetric(Base):
@@ -14,16 +14,18 @@ class EnvironmentalMetric(Base):
     company_id: Mapped[int] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE"))
     reporting_year: Mapped[int] = mapped_column(Integer, nullable=False)
-    energy_consumption_mwh: Mapped[float] = mapped_column(Numeric(10, 2))
-    carbon_emissions_tco2e: Mapped[float] = mapped_column(Numeric(10, 2))
-    water_usage_m3: Mapped[float | None] = mapped_column(Numeric(10, 2))
-    waste_generated_tonnes: Mapped[float |
-                                   None] = mapped_column(Numeric(10, 2))
 
-    # Composite unique constraint
+    energy_consumption_mwh: Mapped[float] = mapped_column(Float, default=0.0)
+    carbon_emissions_tco2e: Mapped[float] = mapped_column(Float, default=0.0)
+    water_usage_m3: Mapped[float | None] = mapped_column(Float, nullable=True)
+    waste_generated_tonnes: Mapped[float |
+                                   None] = mapped_column(Float, nullable=True)
+
     __table_args__ = (UniqueConstraint(
         'company_id', 'reporting_year', name='uq_company_year'),)
 
-    # Relationship
     company: Mapped["Company"] = relationship(
         back_populates="environmental_metrics")
+
+    def __repr__(self) -> str:
+        return f"<EnvMetric(company_id={self.company_id}, year={self.reporting_year})>"

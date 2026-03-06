@@ -3,26 +3,27 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
+# 1. FIRST
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+
+# 2. SECOND
 from app.core.config import settings
-from app.database import Base
+from app.database.session import Base
 
-# THIS IS CRITICAL - Add your src directory to Python path
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+# 3. THIRD
+# from app.models import Company, EnvironmentalMetric,
+# LoanSimulation, NationalEnergy, RegionalEmission
 
-# Import your SQLAlchemy Base and models
-
-# this is the Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the database URL from your settings (sync version for migrations)
-# Remove +asyncpg for sync operations
+# Convert asyncpg URL to standard sync URL for Alembic
 sync_url = str(settings.DATABASE_URL).replace("+asyncpg", "")
 config.set_main_option("sqlalchemy.url", sync_url)
 

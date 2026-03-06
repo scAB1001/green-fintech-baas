@@ -56,3 +56,8 @@ instance/
 *.sqlite3
 git.sh
 clean.sh
+
+# Data files
+data/
+*.csv
+*.xslx

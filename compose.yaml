@@ -6,7 +6,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-green_fintech}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      # Optional: Additional authentication method (defaults to scram-sha-256)
       POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth=scram-sha-256}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -39,25 +38,33 @@ services:
     env_file:
       - .env
     environment:
-      - ENVIRONMENT=production  # Force production names inside the container
+      - ENVIRONMENT=production  # Force production env inside the container
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-green_fintech}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@green-fintech-cache:6379
     ports:
       - "8080:8000"
+    # Volumes enable watch-like mode (remove for Prod)
+    volumes:
+      - ./src:/app/src
     networks:
       - green-fintech-network
 
   redis:
     image: redis:8-alpine
     container_name: green-fintech-cache
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    ports:
+      - "6379:6379"
     networks:
       - green-fintech-network
+    restart: unless-stopped
 
 networks:
   green-fintech-network:
