@@ -109,7 +109,7 @@ show_menu() {
     echo -e "  09) $(opt "rd-up")       Start Redis Container    10) $(opt "rd-stat")     Ping & Key Check"
 
     echo -e "\n${BOLD}⚗️  Alembic Migrations${NC}"
-    echo -e "  10) $(opt "mig-new")     Create Autogen Rev       12) $(opt "mig-up")      Preview & Apply"
+    echo -e "  11) $(opt "mig-new")     Create Autogen Rev       12) $(opt "mig-up")      Preview & Apply"
     echo -e "  13) $(opt "mig-stat")    History & Rollback"
 
     echo -e "\n${BOLD}🌐 FastAPI Service${NC}"
@@ -117,7 +117,7 @@ show_menu() {
     echo -e "  16) $(opt "run")         Local Uvicorn Server"
 
     echo -e "\n${BOLD}🌐 Testing, Building and Publishing${NC}"
-    echo -e "  17) $(opt "test")        Pytest (Standard)        18) $(opt "e2e")         E2E (End-to-End) App Test"
+    echo -e "  17) $(opt "test")        Pytest (Standard)        18) $(opt "e2e")         E2E (End-to-End) Test"
     echo -e "  19) $(opt "stack")       Full Docker Stack        20) $(opt "package")     Publish to [Test]PyPI"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
