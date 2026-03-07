@@ -1,6 +1,9 @@
 services:
   postgres:
     image: postgres:18-alpine
+    # REMOVE: When executing pytest-docker tests
+    # appends a random string to the container name for every test run,
+    # completely eliminating the possibility of naming conflicts.
     container_name: green-fintech-db
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}

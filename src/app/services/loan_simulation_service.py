@@ -1,7 +1,9 @@
+# src/app/services/loan_simulation_service.py
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logger import logger
 from app.models.company import Company
 from app.models.loan_simulation import LoanSimulation
 from app.models.national_energy import NationalEnergy
@@ -29,6 +31,8 @@ class LoanSimulationService:
         if not company:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+        logger.info(
+            f"Starting loan simulation for {company.name} (ID: {company_id})")
 
         # 2. Fetch Regional Emissions Data (E_loc)
         emissions_query = select(RegionalEmission).where(
@@ -84,6 +88,8 @@ class LoanSimulationService:
         # 4. Calculate Environmental Performance Score (EPS)
         eps = float((s_nat_score * self.NATIONAL_GRID_WEIGHT) +
                     (e_loc_score * self.LOCATION_EMISSION_WEIGHT))
+        logger.debug(
+            f"Calculated EPS: {eps} (Sector: {s_nat_score}, Location: {e_loc_score})")
 
         # 5. Calculate Margin Ratchet and Final Rate
         discount_applied = (eps / 100.0) * self.MAX_GREEN_DISCOUNT
@@ -110,5 +116,8 @@ class LoanSimulationService:
         self.db.add(simulation)
         await self.db.commit()
         await self.db.refresh(simulation)
+
+        logger.info(
+            f"Simulation complete. Applied Rate: {final_rate}%, ESG Score: {eps}")
 
         return simulation

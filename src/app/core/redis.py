@@ -18,7 +18,7 @@ async def get_redis_client() -> AsyncGenerator[redis.Redis, None]:
     FastAPI dependency that injects the Redis client.
     Yielding it allows us to easily mock it during pytest runs.
     """
-    yield redis_client
+    yield redis_client  # pragma: no cover
 
 
 async def clear_cache(company_id: int):

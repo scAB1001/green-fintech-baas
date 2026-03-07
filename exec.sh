@@ -121,7 +121,7 @@ show_menu() {
 
     echo -e "\n${BOLD}🌐 Testing, Building and Publishing${NC}"
     echo -e "  21) $(opt "stack")       Full Docker Stack        22) $(opt "down")        Stop Containers"
-    echo -e "  23) $(opt "test")        Pytest (Standard)        24) $(opt "cov")         Pytest (XML Coverage)"
+    echo -e "  23) $(opt "test")        Pytest (Standard)        24) $(opt "cov")         Pytest (HTML Coverage)"
     echo -e "  25) $(opt "e2e")         E2E (End-to-End) Test"
     echo -e "  26) $(opt "build")       Package for [Test]PyPI   27) $(opt "publish")     Publish to [Test]PyPI"
 
@@ -183,9 +183,12 @@ exec_cmd() {
             log_info "Checking lockfile integrity..."
             uv lock --check
 
-            log_info "Displaying dependency tree..."
-            uv tree
+            if ask_yes_no "Would you like to view the dependency tree?"; then
+                uv tree --all-groups
+            fi
 
+            log_info "Exporting dependencies to requirements.txt..."
+            uv export --format requirements.txt --output-file requirements.txt >/dev/null
             log_success "Lockfiles updated successfully."
             ;;
 
@@ -212,7 +215,7 @@ exec_cmd() {
             sleep 2
 
             log_info "Seeding data..."
-            uv run python -m scripts.seed_db && log_success "Seeds planted" || log_error "Seeding failed"
+            uv run python -m scripts.seed_db 2>&1 && log_success "Seeds planted" || log_error "Seeding failed"
             log_success "Postgres db fully initialised."
             ;;
 
@@ -369,6 +372,12 @@ exec_cmd() {
                 -d '{ "company_number": "00445790" }' || log_error "Ingestion failed"
             echo
 
+            log_info "Performing SHELL PLC ingestion via Opencorporates with CURL..."
+            curl -X 'POST' 'http://localhost:8080/api/v1/companies/' \
+                -H 'Content-Type: application/json' \
+                -d '{ "company_number": "04366849" }' || log_error "Ingestion failed"
+            echo
+
             log_info "Performing TESCO PLC loan simulation with CURL..."
             curl -X 'POST' 'http://localhost:8080/api/v1/companies/1/simulate-loan' \
                 -H 'Content-Type: application/json' \
@@ -440,7 +449,7 @@ exec_cmd() {
 
             header "DOCKER COMPOSE STACK"
             log_info "Clearing space..."
-            _compose_down -v && log_success "Environment wiped"
+            _compose_down --remove-orphans -v && log_success "Environment wiped"
 
             if ask_yes_no "Would you like to clear Docker artifacts?"; then
                 docker builder prune -f >/dev/null 2>&1 && log_success "Docker artifacts cleaned"
@@ -482,7 +491,9 @@ exec_cmd() {
             header "RUNNING TEST SUITE"
             if [ "$2" == "cov" ]; then
                 log_info "Running tests with coverage report..."
-                uv run pytest --cov=src --cov-report=html && log_success "Coverage report generated in index.html"
+                uv run pytest --cov=src --cov-report=html
+                log_success "Coverage report generated in htmlcov/index.html"
+
                 log_info "Opening coverage report in browser..."
                 xdg-open htmlcov/index.html
             else
