@@ -491,7 +491,7 @@ exec_cmd() {
             header "RUNNING TEST SUITE"
             if [ "$2" == "cov" ]; then
                 log_info "Running tests with coverage report..."
-                uv run pytest --cov-config=.coveragerc --cov=src --cov-report=html
+                uv run pytest --cov=src --cov-report=html
                 log_success "Coverage report generated in htmlcov/index.html"
 
                 log_info "Opening coverage report in browser..."

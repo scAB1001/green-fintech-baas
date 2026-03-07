@@ -161,3 +161,110 @@ async def test_delete_company_flows(async_client: AsyncClient, seed_companies):
     # 2. Verify 404 Not Found on subsequent request
     response_not_found = await async_client.delete("/api/v1/companies/99999")
     assert response_not_found.status_code == 404
+
+# tests/integration/api_endpoint_tests/companies_router_test.py
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_get_company_db_hit_and_cache_set(
+    async_client: AsyncClient, seed_companies):
+    """
+    Tests the DB fallback block:
+    Proves that a cache miss hits the DB (scalars().first()),
+    finds the company, and calls set_cached_object.
+    """
+    target = seed_companies[0]
+
+    # We patch both the get (to force a miss) and the set (to spy on it)
+    with patch(
+        "app.api.v1.endpoints.companies.get_cached_object",
+        new_callable=AsyncMock) as mock_get, \
+            patch(
+                "app.api.v1.endpoints.companies.set_cached_object",
+                new_callable=AsyncMock) as mock_set:
+
+        mock_get.return_value = None  # Force a cache miss
+
+        response = await async_client.get(f"/api/v1/companies/{target.id}")
+
+        assert response.status_code == 200
+        assert response.json()["name"] == target.name
+        # Proves the cache population block executed
+        mock_set.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_get_company_not_found(async_client: AsyncClient):
+    """Proves result.scalars().first() returns None and raises 404."""
+    with patch(
+        "app.api.v1.endpoints.companies.get_cached_object",
+        new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = None
+
+        response = await async_client.get("/api/v1/companies/99999")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Company not found"
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_update_company_success_and_cache_invalidate(
+    async_client: AsyncClient,
+    seed_companies):
+    """Tests successful PATCH, db.commit(), and cache invalidation."""
+    target = seed_companies[0]
+
+    # Spy on the cache invalidation function
+    with patch(
+        "app.api.v1.endpoints.companies.invalidate_cache",
+        new_callable=AsyncMock) as mock_inv:
+        response = await async_client.patch(
+            f"/api/v1/companies/{target.id}",
+            json={"location": "New Earth HQ"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["location"] == "New Earth HQ"
+        # Proves the cache was successfully purged
+        mock_inv.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_update_company_not_found(async_client: AsyncClient):
+    """Proves updating a non-existent company triggers the 404 HTTPException."""
+    response = await async_client.patch(
+        "/api/v1/companies/99999",
+        json={"location": "Nowhere"}
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Company not found"
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_delete_company_success_and_cache_invalidate(
+    async_client: AsyncClient, seed_companies):
+    """Tests successful DELETE, db.delete(), and cache invalidation."""
+    target = seed_companies[1]  # Using second company to preserve state
+
+    with patch(
+        "app.api.v1.endpoints.companies.invalidate_cache",
+        new_callable=AsyncMock) as mock_inv:
+        response = await async_client.delete(f"/api/v1/companies/{target.id}")
+
+        assert response.status_code == 204
+        # Proves the cache was successfully purged after deletion
+        mock_inv.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_delete_company_not_found(async_client: AsyncClient):
+    """Proves deleting a non-existent company triggers the 404 HTTPException."""
+    response = await async_client.delete("/api/v1/companies/99999")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Company not found"
