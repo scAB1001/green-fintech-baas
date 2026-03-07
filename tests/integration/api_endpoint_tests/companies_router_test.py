@@ -8,10 +8,9 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 @pytest.mark.api
-async def test_create_company_success(
-    async_client: AsyncClient, mock_oc_response_hsbc):
+async def test_create_company_success(async_client: AsyncClient, mock_oc_response_hsbc):
     """
-    Hits the 'try' block and successful 'return company' using full stack execution.
+    Hits 'try' block and successful 'return company' using full stack execution.
     """
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_response = MagicMock()
@@ -20,8 +19,7 @@ async def test_create_company_success(
         mock_get.return_value = mock_response
 
         response = await async_client.post(
-            "/api/v1/companies/",
-            json={"company_number": "09928412"}
+            "/api/v1/companies/", json={"company_number": "09928412"}
         )
         assert response.status_code == 201
 
@@ -32,9 +30,9 @@ async def test_create_company_http_exception(async_client: AsyncClient):
     """Hits the 'except HTTPException' block."""
     with patch(
         "app.services.company_service.CompanyService.register_company",
-        new_callable=AsyncMock) as mock_reg:
-        mock_reg.side_effect = HTTPException(
-            status_code=429, detail="Rate limited")
+        new_callable=AsyncMock,
+    ) as mock_reg:
+        mock_reg.side_effect = HTTPException(status_code=429, detail="Rate limited")
 
         # Valid 8-char ID to pass Pydantic and reach the router
         response = await async_client.post(
@@ -49,9 +47,10 @@ async def test_create_company_http_exception(async_client: AsyncClient):
 @pytest.mark.api
 async def test_create_company_generic_exception(async_client: AsyncClient):
     """Hits the 'except Exception' fallback block."""
-    with patch("" \
-    "app.services.company_service.CompanyService.register_company",
-    new_callable=AsyncMock) as mock_reg:
+    with patch(
+        "" "app.services.company_service.CompanyService.register_company",
+        new_callable=AsyncMock,
+    ) as mock_reg:
         mock_reg.side_effect = Exception("Catastrophic Database Failure")
 
         # Valid 8-char ID to pass Pydantic and reach the router
@@ -77,15 +76,15 @@ async def test_list_companies_pagination(async_client: AsyncClient, seed_compani
 async def test_get_company_cache_hit(async_client: AsyncClient, seed_companies):
     """Hits the 'if cached_company: return cached_company' block."""
     target = seed_companies[0]
-    with patch("" \
-    "app.api.v1.endpoints.companies.get_cached_object",
-    new_callable=AsyncMock) as mock_cache:
+    with patch(
+        "" "app.api.v1.endpoints.companies.get_cached_object", new_callable=AsyncMock
+    ) as mock_cache:
         mock_cache.return_value = {
             "id": target.id,
             "companies_house_id": target.companies_house_id,
             "name": "Cached Version Corp",
             "business_sector": "IT",
-            "location": "UK"
+            "location": "UK",
         }
         response = await async_client.get(f"/api/v1/companies/{target.id}")
         assert response.status_code == 200
@@ -95,15 +94,19 @@ async def test_get_company_cache_hit(async_client: AsyncClient, seed_companies):
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_get_company_db_hit_and_cache_set(
-        async_client: AsyncClient, seed_companies):
+    async_client: AsyncClient, seed_companies
+):
     """Proves cache miss hits DB, finds company, and calls set_cached_object."""
     target = seed_companies[0]
-    with patch("" \
-    "app.api.v1.endpoints.companies.get_cached_object",
-    new_callable=AsyncMock) as mock_get, \
-            patch(
-                "app.api.v1.endpoints.companies.set_cached_object",
-                new_callable=AsyncMock) as mock_set:
+    with (
+        patch(
+            "" "app.api.v1.endpoints.companies.get_cached_object",
+            new_callable=AsyncMock,
+        ) as mock_get,
+        patch(
+            "app.api.v1.endpoints.companies.set_cached_object", new_callable=AsyncMock
+        ) as mock_set,
+    ):
 
         mock_get.return_value = None  # Force Cache Miss
 
@@ -117,9 +120,9 @@ async def test_get_company_db_hit_and_cache_set(
 @pytest.mark.api
 async def test_get_company_not_found_404(async_client: AsyncClient):
     """Proves result.scalars().first() returning None triggers the 404 block."""
-    with patch("" \
-    "app.api.v1.endpoints.companies.get_cached_object",
-    new_callable=AsyncMock) as mock_get:
+    with patch(
+        "" "app.api.v1.endpoints.companies.get_cached_object", new_callable=AsyncMock
+    ) as mock_get:
         mock_get.return_value = None
         response = await async_client.get("/api/v1/companies/99999")
         assert response.status_code == 404
@@ -128,15 +131,15 @@ async def test_get_company_not_found_404(async_client: AsyncClient):
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_update_company_success_and_cache_invalidate(
-    async_client: AsyncClient, seed_companies):
+    async_client: AsyncClient, seed_companies
+):
     """Tests successful PATCH, db.commit(), and cache invalidation execution."""
     target = seed_companies[0]
     with patch(
-        "app.api.v1.endpoints.companies.invalidate_cache",
-        new_callable=AsyncMock) as mock_inv:
+        "app.api.v1.endpoints.companies.invalidate_cache", new_callable=AsyncMock
+    ) as mock_inv:
         response = await async_client.patch(
-            f"/api/v1/companies/{target.id}",
-            json={"location": "New Earth HQ"}
+            f"/api/v1/companies/{target.id}", json={"location": "New Earth HQ"}
         )
         assert response.status_code == 200
         assert response.json()["location"] == "New Earth HQ"
@@ -156,12 +159,13 @@ async def test_update_company_not_found_404(async_client: AsyncClient):
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_delete_company_success_and_cache_invalidate(
-    async_client: AsyncClient, seed_companies):
+    async_client: AsyncClient, seed_companies
+):
     """Tests successful DELETE, db.delete(), and cache invalidation execution."""
     target = seed_companies[1]
     with patch(
-        "app.api.v1.endpoints.companies.invalidate_cache",
-        new_callable=AsyncMock) as mock_inv:
+        "app.api.v1.endpoints.companies.invalidate_cache", new_callable=AsyncMock
+    ) as mock_inv:
         response = await async_client.delete(f"/api/v1/companies/{target.id}")
         assert response.status_code == 204
         mock_inv.assert_called_once()  # Proves invalidate_cache was executed
@@ -173,3 +177,67 @@ async def test_delete_company_not_found_404(async_client: AsyncClient):
     """Proves deleting a non-existent company triggers the 404 HTTPException."""
     response = await async_client.delete("/api/v1/companies/99999")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_export_companies_csv(async_client: AsyncClient, seed_companies):
+    """Tests the text/csv generation endpoint."""
+    response = await async_client.get("/api/v1/companies/export/csv")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert (
+        'attachment; filename="companies_export.csv"'
+        in response.headers["content-disposition"]
+    )
+
+    # Verify the CSV contains our seeded data
+    csv_content = response.text
+    assert "Company Number,Name,Sector,Location" in csv_content
+    assert seed_companies[0].name in csv_content
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_get_loan_simulation_pdf(
+    async_client: AsyncClient, seed_companies, db_session
+):
+    """Tests the application/pdf generation endpoint."""
+    target_company = seed_companies[0]
+
+    # Seed a fake simulation for the test
+    from app.models.loan_simulation import LoanSimulation
+
+    sim = LoanSimulation(
+        company_id=target_company.id,
+        loan_amount=500000,
+        term_months=60,
+        base_rate=5.0,
+        applied_rate=4.5,
+        esg_score=75.0,
+        estimated_carbon_savings=10.5,
+    )
+    db_session.add(sim)
+    await db_session.commit()
+    await db_session.refresh(sim)
+
+    # 1. Test Successful PDF Generation
+    response = await async_client.get(
+        f"/api/v1/companies/{target_company.id}/simulate-loan/{sim.id}/pdf"
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    # All valid PDFs start with this byte signature
+    assert response.content.startswith(b"%PDF-")
+
+    # 2. Test Company Not Found
+    response_no_company = await async_client.get(
+        f"/api/v1/companies/99999/simulate-loan/{sim.id}/pdf"
+    )
+    assert response_no_company.status_code == 404
+
+    # 3. Test Simulation Not Found
+    response_no_sim = await async_client.get(
+        f"/api/v1/companies/{target_company.id}/simulate-loan/99999/pdf"
+    )
+    assert response_no_sim.status_code == 404

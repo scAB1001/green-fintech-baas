@@ -29,7 +29,10 @@ dependencies = [
     "alembic>=1.18.4,<2.0.0",
     "psycopg2-binary>=2.9.11,<3.0.0",
     "uvicorn>=0.40.0,<0.41.0",
-    "redis>=7.2.1,<8.0.0"
+    "redis>=7.2.1,<8.0.0",
+    "reportlab>=4.4.10",
+    "pandas-stubs>=3.0.0.260204",
+    "types-reportlab>=4.4.10.20260223",
 ]
 
 [project.urls]
@@ -112,7 +115,6 @@ omit = [
 show_missing = true
 # Fail CI/CD pipeline if coverage < 80% (industry standard)
 fail_under = 80
-# Ignore specific lines that shouldn't be tested
 exclude_also = [
     "def __repr__",              # Ignore SQLAlchemy model debug representations
     "if TYPE_CHECKING:",         # Ignore type-hinting imports
@@ -122,6 +124,10 @@ exclude_also = [
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+[tool.black]
+target-version = ["py312"]
+line-length = 88
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "B", "F401"]

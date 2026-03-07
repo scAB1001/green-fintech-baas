@@ -41,14 +41,10 @@ async def test_get_company_not_found(async_client: AsyncClient):
 async def test_simulate_loan_endpoint(async_client: AsyncClient, seed_companies):
     """Test the POST /companies/{id}/simulate-loan endpoint."""
     target_id = seed_companies[0].id
-    payload = {
-        "loan_amount": 1000000.0,
-        "term_months": 120
-    }
+    payload = {"loan_amount": 1000000.0, "term_months": 120}
 
     response = await async_client.post(
-        f"/api/v1/companies/{target_id}/simulate-loan",
-        json=payload
+        f"/api/v1/companies/{target_id}/simulate-loan", json=payload
     )
 
     assert response.status_code == 201

@@ -47,8 +47,7 @@ def create_application() -> FastAPI:
             "version": settings.VERSION,
         }
 
-    app.include_router(
-        companies.router, prefix="/api/v1/companies", tags=["companies"])
+    app.include_router(companies.router, prefix="/api/v1/companies", tags=["companies"])
 
     return app
 

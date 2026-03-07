@@ -12,7 +12,7 @@ def test_company_schema_valid():
         "name": "EcoTech Ltd",
         "companies_house_id": "12345678",
         "business_sector": "Technology",
-        "location": "Birmingham"
+        "location": "Birmingham",
     }
     # Using a placeholder if schema isn't implemented yet
     assert data["companies_house_id"] == "12345678"

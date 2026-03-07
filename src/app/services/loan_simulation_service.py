@@ -24,15 +24,16 @@ class LoanSimulationService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def generate_quote(self, company_id: int, loan_amount: float,
-                             term_months: int) -> LoanSimulation:
+    async def generate_quote(
+        self, company_id: int, loan_amount: float, term_months: int
+    ) -> LoanSimulation:
         # 1. Fetch the target company
         company = await self.db.get(Company, company_id)
         if not company:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
-        logger.info(
-            f"Starting loan simulation for {company.name} (ID: {company_id})")
+                status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+            )
+        logger.info(f"Starting loan simulation for {company.name} (ID: {company_id})")
 
         # 2. Fetch Regional Emissions Data (E_loc)
         emissions_query = select(RegionalEmission).where(
@@ -54,17 +55,27 @@ class LoanSimulationService:
         # 3. Fetch National Energy Data (S_nat)
         target_country = "United Kingdom"
 
-        total_energy_query = select(NationalEnergy).where(
-            NationalEnergy.country == target_country,
-            NationalEnergy.energy_type == "all_energy_types"
-        ).order_by(NationalEnergy.year.desc()).limit(1)
+        total_energy_query = (
+            select(NationalEnergy)
+            .where(
+                NationalEnergy.country == target_country,
+                NationalEnergy.energy_type == "all_energy_types",
+            )
+            .order_by(NationalEnergy.year.desc())
+            .limit(1)
+        )
         total_energy_result = await self.db.execute(total_energy_query)
         total_energy_data = total_energy_result.scalars().first()
 
-        renew_energy_query = select(NationalEnergy).where(
-            NationalEnergy.country == target_country,
-            NationalEnergy.energy_type == "renewables_n_other"
-        ).order_by(NationalEnergy.year.desc()).limit(1)
+        renew_energy_query = (
+            select(NationalEnergy)
+            .where(
+                NationalEnergy.country == target_country,
+                NationalEnergy.energy_type == "renewables_n_other",
+            )
+            .order_by(NationalEnergy.year.desc())
+            .limit(1)
+        )
         renew_energy_result = await self.db.execute(renew_energy_query)
         renew_energy_data = renew_energy_result.scalars().first()
 
@@ -86,10 +97,13 @@ class LoanSimulationService:
             s_nat_score = 20.0  # Conservative baseline
 
         # 4. Calculate Environmental Performance Score (EPS)
-        eps = float((s_nat_score * self.NATIONAL_GRID_WEIGHT) +
-                    (e_loc_score * self.LOCATION_EMISSION_WEIGHT))
+        eps = float(
+            (s_nat_score * self.NATIONAL_GRID_WEIGHT)
+            + (e_loc_score * self.LOCATION_EMISSION_WEIGHT)
+        )
         logger.debug(
-            f"Calculated EPS: {eps} (Sector: {s_nat_score}, Location: {e_loc_score})")
+            f"Calculated EPS: {eps} (Sector: {s_nat_score}, Location: {e_loc_score})"
+        )
 
         # 5. Calculate Margin Ratchet and Final Rate
         discount_applied = (eps / 100.0) * self.MAX_GREEN_DISCOUNT
@@ -109,8 +123,7 @@ class LoanSimulationService:
             base_rate=self.BASE_INTEREST_RATE,
             applied_rate=round(final_rate, 2),
             esg_score=round(eps, 2),
-            estimated_carbon_savings=round(
-                (eps / 100) * (loan_amount / 1000), 2)
+            estimated_carbon_savings=round((eps / 100) * (loan_amount / 1000), 2),
         )
 
         self.db.add(simulation)
@@ -118,6 +131,7 @@ class LoanSimulationService:
         await self.db.refresh(simulation)
 
         logger.info(
-            f"Simulation complete. Applied Rate: {final_rate}%, ESG Score: {eps}")
+            f"Simulation complete. Applied Rate: {final_rate}%, ESG Score: {eps}"
+        )
 
         return simulation

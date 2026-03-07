@@ -11,8 +11,8 @@ from app.services.opencorporates import OpenCorporatesClient
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_create_company_endpoint_success(
-    async_client: AsyncClient,
-    mock_oc_response_shell):
+    async_client: AsyncClient, mock_oc_response_shell
+):
     """Test POST /companies/ ingests a new company successfully."""
     client = OpenCorporatesClient()
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -96,12 +96,13 @@ async def test_simulate_loan_internal_error(async_client: AsyncClient, seed_comp
     # but crash the mathematical engine (e.g. mocking the service to throw an exception)
     with patch(
         "app.services.loan_simulation_service.LoanSimulationService.generate_quote",
-        new_callable=AsyncMock) as mock_sim:
+        new_callable=AsyncMock,
+    ) as mock_sim:
         mock_sim.side_effect = Exception("Database connection lost")
 
         response = await async_client.post(
             f"/api/v1/companies/{target_id}/simulate-loan",
-            json={"loan_amount": 1000000, "term_months": 120}
+            json={"loan_amount": 1000000, "term_months": 120},
         )
         assert response.status_code == 500
         assert "Database connection lost" in response.json()["detail"]

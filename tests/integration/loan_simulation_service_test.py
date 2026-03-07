@@ -17,9 +17,7 @@ async def test_generate_quote_success(db_session, seed_companies, seed_metrics):
 
     # Run the simulation
     simulation = await service.generate_quote(
-        company_id=target_company.id,
-        loan_amount=500000.0,
-        term_months=60
+        company_id=target_company.id, loan_amount=500000.0, term_months=60
     )
 
     assert simulation.company_id == target_company.id

@@ -19,7 +19,7 @@ async def test_create_company_model(db_session):
         name="Green Hydrogen Corp",
         companies_house_id="GH123456",
         business_sector="Energy",
-        location="Leeds"
+        location="Leeds",
     )
     db_session.add(new_company)
     await db_session.flush()  # Sync with DB but don't commit yet
@@ -43,7 +43,7 @@ async def test_environmental_metric_relationship(db_session):
         name="Test Corp",
         companies_house_id="TC000001",
         business_sector="Technology",  # Added
-        location="London"             # Added
+        location="London",  # Added
     )
     db_session.add(company)
     await db_session.flush()
@@ -53,7 +53,7 @@ async def test_environmental_metric_relationship(db_session):
         company_id=company.id,
         reporting_year=2025,
         energy_consumption_mwh=450.50,
-        carbon_emissions_tco2e=12.5
+        carbon_emissions_tco2e=12.5,
     )
     db_session.add(metric)
     await db_session.flush()
