@@ -5,6 +5,8 @@ on:
     branches-ignore: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       logLevel:
@@ -55,7 +57,6 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-      # Fail if pyproject.toml and uv.lock aren't synced. Prevents version drifting. --frozen for sync
         run: |
           uv lock
           uv sync --all-groups
@@ -63,7 +64,17 @@ jobs:
       - name: Run Tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-        run: uv run pytest --cov --cov-branch --cov-report=xml
+        run: uv run pytest --cov --cov-branch --cov-report=xml --junitxml=pytest-results.xml | tee pytest-output.txt
+
+      - name: Upload Test Results Artifact
+        if: always() # Ensures we get the logs even if a test fails!
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-result-tests
+          path: |
+            coverage.xml
+            pytest-results.xml
+            pytest-output.txt
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -103,6 +114,16 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Save Build Status
+      run: echo "Docker image built and pushed to GHCR for SHA ${{ github.sha }}" > build-output.txt
+
+    - name: Upload Build Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-result-build
+        path: build-output.txt
+
   deploy-staging:
       needs: [lint-and-test, build-and-push]
       runs-on: ubuntu-latest
@@ -118,6 +139,23 @@ jobs:
           env:
             RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           run: |
-            # --detach lets the CI finish without waiting for the build to end
-            # --service identifies which service in your project to update
             railway up --detach --service green-fintech-api
+            echo "Successfully triggered Railway deployment for SHA ${{ github.sha }}" > deploy-output.txt
+
+        - name: Upload Deploy Artifact
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: ci-result-deploy
+            path: deploy-output.txt
+
+  merge-results:
+    if: always() # Run even if previous jobs skipped/failed so we always get a consolidated report
+    needs: [lint-and-test, build-and-push, deploy-staging]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge all CI artifacts
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: all-ci-results
+          pattern: ci-result-*
