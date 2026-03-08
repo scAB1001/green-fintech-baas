@@ -87,7 +87,7 @@ _compose_logs() {
 API_BASE_URL="http://localhost:8080"
 
 # TODO: Use in base
-ENDPOINT_ROOT="api/v1/"
+# ENDPOINT_ROUTER="api/v1/"
 
 # Usage: _api_get "/endpoint"
 _api_get() {
@@ -101,6 +101,11 @@ _api_post() {
         -H 'Content-Type: application/json' \
         -H 'accept: application/json' \
         -d "$2"
+}
+
+# Usage: _api_delete "/endpoint"
+_api_delete() {
+    curl -s -X 'DELETE' "${API_BASE_URL}$1" -H 'accept: application/json'
 }
 
 # Usage: _api_status "GET" "/endpoint"
@@ -228,46 +233,6 @@ exec_cmd() {
             log_info "Exporting dependencies to requirements.txt..."
             uv export --format requirements.txt --output-file requirements.txt >/dev/null
             log_success "Lockfiles updated successfully."
-
-            echo "1. Getting CSV (First hit takes longer, creates cache)"
-            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/export/csv
-
-            echo -e "\n2. Getting CSV (Second hit is INSTANT from cache)"
-            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/export/csv
-
-            echo -e "\n3. Getting PDF (First hit takes longer)"
-            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/1/simulate-loan/1/pdf
-
-            echo -e "\n4. Getting PDF (Second hit is INSTANT from base64 cache)"
-            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/1/simulate-loan/1/pdf
-
-            echo -e "\n5. Proving the keys exist in Redis:"
-            _redis KEYS "*"
-
-            echo -e "\n6. Triggering a cache invalidation (Deleting a company...)"
-            # Assuming ID 2 is safe to delete
-            curl -s -X DELETE http://localhost:8080/api/v1/companies/2
-
-            echo -e "\n7. Proving the CSV and List keys were automatically purged by the DELETE request:"
-            _redis KEYS "*"
-
-            echo "0. Current state:"
-            _redis KEYS "*"
-
-            echo "1. Getting CSV to ensure the cache key exists:"
-            curl -s -o /dev/null http://localhost:8080/api/v1/companies/export/csv
-
-            echo "2. Current Redis Keys (Notice companies:csv is there):"
-            _redis KEYS "*"
-
-            echo -e "\n3. Ingesting a NEW company (Barclays) to trigger cache invalidation..."
-            curl -s -X POST http://localhost:8080/api/v1/companies/ \
-                -H "Content-Type: application/json" \
-                -d '{"company_number": "01026167"}'
-            echo -e "\nIngestion complete."
-
-            echo -e "\n4. Checking Redis Keys again (The CSV key should be gone!):"
-            _redis KEYS "*"
             ;;
 
         "lint")
@@ -435,6 +400,45 @@ exec_cmd() {
             log_info "Checking container logs..."
             _compose_logs redis
             log_success "Redis status check complete."
+
+            header "CACHING & INVALIDATION DIAGNOSTICS"
+            log_info "1. Timing CSV Export (Cache Miss - DB Generation)..."
+            time curl -s -o /dev/null -X 'GET' "${API_BASE_URL}/api/v1/companies/export/csv"
+
+            echo
+            log_info "2. Timing CSV Export (Cache Hit - Should be INSTANT)..."
+            time curl -s -o /dev/null -X 'GET' "${API_BASE_URL}/api/v1/companies/export/csv"
+
+            echo
+            log_info "3. Timing PDF Generation (Cache Miss - CPU Generation)..."
+            time curl -s -o /dev/null -X 'GET' "${API_BASE_URL}/api/v1/companies/1/simulate-loan/1/pdf"
+
+            echo
+            log_info "4. Timing PDF Generation (Cache Hit - Base64 Decode)..."
+            time curl -s -o /dev/null -X 'GET' "${API_BASE_URL}/api/v1/companies/1/simulate-loan/1/pdf"
+
+            echo
+            log_info "5. Current Redis Keys (Should contain CSV and PDF):"
+            _redis KEYS "*"
+
+            log_info "6. Ingesting Barclays (01026167) to trigger POST invalidation..."
+            _api_post "/api/v1/companies/" '{"company_number": "01026167"}' > /dev/null
+            echo
+            log_success "Ingestion complete."
+
+            log_info "7. Checking Redis Keys (The 'companies:csv' key should be purged):"
+            _redis KEYS "*"
+
+            log_info "8. Re-caching the CSV file..."
+            curl -s -o /dev/null -X 'GET' "${API_BASE_URL}/api/v1/companies/export/csv"
+
+            log_info "9. Triggering DELETE invalidation (Removing Company ID 2)..."
+            _api_delete "/api/v1/companies/2" > /dev/null
+            log_success "Deletion complete."
+
+            log_info "10. Final Redis Keys (The 'companies:csv' key should be purged again):"
+            _redis KEYS "*"
+            log_success "Cache behavior diagnostics complete."
             ;;
 
         "rd-cli")
