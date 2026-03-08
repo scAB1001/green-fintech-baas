@@ -213,6 +213,27 @@ async def test_export_companies_csv(async_client: AsyncClient, seed_companies):
 
 @pytest.mark.asyncio
 @pytest.mark.api
+async def test_simulate_loan_internal_error(async_client: AsyncClient, seed_companies):
+    """Test POST /companies/{id}/simulate-loan catches generic exceptions."""
+    target_id = seed_companies[0].id
+
+    # We force a failure by mocking the service to throw an exception
+    with patch(
+        "app.services.loan_simulation_service.LoanSimulationService.generate_quote",
+        new_callable=AsyncMock,
+    ) as mock_sim:
+        mock_sim.side_effect = Exception("Database connection lost")
+
+        response = await async_client.post(
+            f"/api/v1/companies/{target_id}/simulate-loan",
+            json={"loan_amount": 1000000, "term_months": 120},
+        )
+        assert response.status_code == 500
+        assert "Database connection lost" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
 async def test_get_loan_simulation_pdf(
     async_client: AsyncClient,
     seed_companies,
