@@ -13,8 +13,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Green FinTech BaaS Simulator"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
-    ENVIRONMENT: str = str(
-        Field("development", validation_alias="ENVIRONMENT"))
+    ENVIRONMENT: str = str(Field("development", validation_alias="ENVIRONMENT"))
 
     # DB Settings
     POSTGRES_USER: str = "postgres"
@@ -46,15 +45,14 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         """Build database URL from components or use environment variable."""
         import os
+
         explicit_url = os.environ.get("DATABASE_URL")
         if explicit_url:
             return explicit_url
 
         # Fallback for local development outside of Docker
         host = (
-            "green-fintech-db"
-            if self.is_production
-            else "localhost"
+            "green-fintech-db" if self.is_production else "localhost"
         )  # pragma: no cover
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{host}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
@@ -62,15 +60,14 @@ class Settings(BaseSettings):
     def REDIS_URL(self) -> str:
         """Build Redis URL from components or use environment variable."""
         import os
+
         explicit_url = os.environ.get("REDIS_URL")
         if explicit_url:
             return explicit_url
 
         # Fallback for local development
         host = (
-            "green-fintech-db"
-            if self.is_production
-            else "localhost"
+            "green-fintech-db" if self.is_production else "localhost"
         )  # pragma: no cover
         return f"redis://:{self.REDIS_PASSWORD}@{host}:6379"
 

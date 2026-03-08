@@ -34,19 +34,22 @@ def docker_compose_file():
 @pytest.fixture(scope="session")
 def test_db_url(docker_ip, docker_services) -> str:
     port = docker_services.port_for("postgres_test", 5432)
-    db_url = f"postgresql+asyncpg://postgres:postgres@{docker_ip}:{port}/green_fintech_test"
+    db_url = (
+        f"postgresql+asyncpg://postgres:postgres@{docker_ip}:{port}/green_fintech_test"
+    )
 
     # Synchronous health check to satisfy wait_until_responsive
     def is_db_responsive():
         try:
             import psycopg
+
             conn = psycopg.connect(
                 host=docker_ip,
                 port=port,
                 user="postgres",
                 password="postgres",
                 dbname="postgres",
-                connect_timeout=1
+                connect_timeout=1,
             )
             conn.close()
             return True
@@ -54,7 +57,8 @@ def test_db_url(docker_ip, docker_services) -> str:
             return False
 
     docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.5, check=is_db_responsive)
+        timeout=30.0, pause=0.5, check=is_db_responsive
+    )
     return db_url
 
 
@@ -65,7 +69,7 @@ async def test_engine(test_db_url: str) -> AsyncGenerator[AsyncEngine, None]:
     engine = create_async_engine(
         test_db_url,
         poolclass=NullPool,  # Don't pool connections across different loops
-        echo=False
+        echo=False,
     )
 
     async with engine.begin() as conn:
@@ -89,7 +93,7 @@ async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, N
         session = AsyncSession(
             bind=connection,
             expire_on_commit=False,
-            join_transaction_mode="create_savepoint"
+            join_transaction_mode="create_savepoint",
         )
 
         yield session
@@ -106,6 +110,7 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
     Uses ASGITransport to bridge httpx directly to the FastAPI app.
     Override the app's dependencies to use the test session and a mocked cache.
     """
+
     # 1. Setup Dependency Injection
     def _get_test_db():
         yield db_session
@@ -127,10 +132,7 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
     transport = ASGITransport(app=app)
 
     # 3. Initialize Client
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://testserver"
-    ) as ac:
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
 
     # 4. Cleanup
@@ -165,6 +167,7 @@ async def seed_metrics(db_session: AsyncSession, seed_companies):
         del item["company_name"]  # Remove name, we only need ID
 
     from app.models.environmental_metric import EnvironmentalMetric
+
     metrics = [EnvironmentalMetric(**item) for item in data]
     db_session.add_all(metrics)
     await db_session.flush()
@@ -174,23 +177,28 @@ async def seed_metrics(db_session: AsyncSession, seed_companies):
 @pytest.fixture
 def mock_oc_response_tesco():
     """Loads a highly realistic OpenCorporates API payload from fixtures."""
-    fixture_path = pathlib.Path(__file__).parent / \
-        "fixtures" / "opencorporates_tesco.json"
+    fixture_path = (
+        pathlib.Path(__file__).parent / "fixtures" / "opencorporates_tesco.json"
+    )
     with open(fixture_path) as f:
         return json.load(f)
+
 
 @pytest.fixture
 def mock_oc_response_shell():
     """Loads a highly realistic OpenCorporates API payload from fixtures."""
-    fixture_path = pathlib.Path(__file__).parent / \
-        "fixtures" / "opencorporates_shell.json"
+    fixture_path = (
+        pathlib.Path(__file__).parent / "fixtures" / "opencorporates_shell.json"
+    )
     with open(fixture_path) as f:
         return json.load(f)
+
 
 @pytest.fixture
 def mock_oc_response_hsbc():
     """Loads a highly realistic OpenCorporates API payload from fixtures."""
-    fixture_path = pathlib.Path(__file__).parent / \
-        "fixtures" / "opencorporates_hsbc.json"
+    fixture_path = (
+        pathlib.Path(__file__).parent / "fixtures" / "opencorporates_hsbc.json"
+    )
     with open(fixture_path) as f:
         return json.load(f)

@@ -1,5 +1,6 @@
 # src/app/models/company.py
 """Company model for financial entities."""
+
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Integer, String
@@ -14,16 +15,17 @@ if TYPE_CHECKING:
 
 class Company(Base):
     """Represents a company/business entity."""
+
     __tablename__ = "companies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     companies_house_id: Mapped[str] = mapped_column(
-        String(8), unique=True, index=True, nullable=False)
+        String(8), unique=True, index=True, nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_sector: Mapped[str] = mapped_column(String(100))
     location: Mapped[str] = mapped_column(String(100))
-    opencorporates_url: Mapped[str | None] = mapped_column(
-        String(255), nullable=True)
+    opencorporates_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     environmental_metrics: Mapped[list["EnvironmentalMetric"]] = relationship(
         back_populates="company", cascade="all, delete-orphan"

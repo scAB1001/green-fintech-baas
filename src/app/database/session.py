@@ -1,5 +1,6 @@
 # src/app/database/session.py
 """Async database session management."""
+
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -9,9 +10,8 @@ from app.core.config import settings
 
 # Convert PostgresDsn to string and ensure asyncpg driver
 database_url = str(settings.DATABASE_URL)
-if database_url and '+asyncpg' not in database_url:
-    database_url = database_url.replace(
-        'postgresql://', 'postgresql+asyncpg://')
+if database_url and "+asyncpg" not in database_url:
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
 
 # Create async engine
 engine = create_async_engine(

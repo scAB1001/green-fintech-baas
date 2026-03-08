@@ -1,11 +1,11 @@
-# tests/unit/opencorporates_test.py
+# tests/unit/opencorporates_service.py
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from fastapi import HTTPException
 
-from app.services.opencorporates import OpenCorporatesClient
+from app.services.opencorporates_service import OpenCorporatesClient
 
 
 @pytest.mark.asyncio

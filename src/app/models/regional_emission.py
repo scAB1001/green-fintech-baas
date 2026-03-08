@@ -1,5 +1,6 @@
 # src/app/models/regional_emission.py
 """Regional Emission model for emission data by region."""
+
 from sqlalchemy import Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,7 +12,8 @@ class RegionalEmission(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     local_authority: Mapped[str] = mapped_column(
-        String(255), index=True, nullable=False)
+        String(255), index=True, nullable=False
+    )
     year: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
 
     industry_total: Mapped[float] = mapped_column(Float, default=0.0)

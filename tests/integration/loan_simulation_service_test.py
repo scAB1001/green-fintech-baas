@@ -1,34 +1,58 @@
-# tests/integration/testloan_simulation_service_test.py
+# tests/integration/loan_simulation_service_test.py
 import pytest
 from fastapi import HTTPException
 
-from app.models.company import Company
+from app.models.national_energy import NationalEnergy
+from app.models.regional_emission import RegionalEmission
 from app.services.loan_simulation_service import LoanSimulationService
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_generate_quote_success(db_session, seed_companies, seed_metrics):
-    """Test that the math and DB queries calculate the correct ESG score."""
+async def test_generate_quote_success_with_reference_data(
+    db_session,
+    seed_companies
+):
+    """
+    Test that the DB queries successfully fetch reference data for the math engine.
+    """
+    target_company = seed_companies[0]  # Has location "Leeds"
+
+    # 1. Seed the required reference data for "Leeds" and "United Kingdom"
+    regional = RegionalEmission(
+        local_authority="Leeds", year=2024, grand_total=500.0
+    )
+    energy_total = NationalEnergy(
+        country="United Kingdom",
+        energy_type="all_energy_types",
+        year=2024,
+        energy_consumption=1000.0
+    )
+    energy_renew = NationalEnergy(
+        country="United Kingdom",
+        energy_type="renewables_n_other",
+        year=2024,
+        energy_consumption=800.0
+    )
+    db_session.add_all([regional, energy_total, energy_renew])
+    await db_session.commit()
+
+    # 2. Run the simulation
     service = LoanSimulationService(db=db_session)
-
-    # Grab the first seeded company (Green Hydrogen Corp)
-    target_company = seed_companies[0]
-
-    # Run the simulation
     simulation = await service.generate_quote(
-        company_id=target_company.id,
-        loan_amount=500000.0,
-        term_months=60
+        company_id=target_company.id, loan_amount=500000.0, term_months=60
     )
 
+    # 3. Verify the database pipeline worked
     assert simulation.company_id == target_company.id
     assert simulation.loan_amount == 500000.0
-    assert simulation.term_months == 60
-    assert simulation.base_rate == 8.00
-    # Ensure the applied rate is lower than or equal to the base rate
-    assert simulation.applied_rate <= simulation.base_rate
-    assert simulation.esg_score >= 0.0
+
+    # 4. Mathematically prove the discount was applied based on the seeded data
+    # S_nat = (800 / 1000) * 100 = 80
+    # E_loc = 100 - ((500 / 5000) * 100) = 90
+    # EPS = (80 * 0.3) + (90 * 0.7) = 87.0
+    assert simulation.esg_score == 87.0
+    assert simulation.applied_rate < simulation.base_rate
 
 
 @pytest.mark.asyncio
@@ -38,6 +62,8 @@ async def test_generate_quote_company_not_found(db_session):
     service = LoanSimulationService(db=db_session)
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.generate_quote(company_id=9999, loan_amount=1000, term_months=12)
+        await service.generate_quote(
+            company_id=9999, loan_amount=1000, term_months=12
+        )
 
     assert exc_info.value.status_code == 404
