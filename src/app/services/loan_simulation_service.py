@@ -24,6 +24,34 @@ class LoanSimulationService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    @staticmethod
+    def calculate_green_rate(
+        emissions_kt: float,
+        total_consumption: float,
+        renew_consumption: float,
+        base_rate: float,
+        max_discount: float
+    ) -> tuple[float, float]:
+        """Pure function for mathematical ESG rate calculation."""
+
+        # 1. Location Score
+        e_loc_score = max(0.0, 100.0 - ((emissions_kt / 5000.0) * 100.0))
+
+        # 2. National Score
+        if total_consumption > 0:
+            s_nat_score = (renew_consumption / total_consumption) * 100.0
+        else:
+            s_nat_score = 20.0
+
+        # 3. EPS
+        eps = float((s_nat_score * 0.30) + (e_loc_score * 0.70))
+
+        # 4. Final Rate
+        discount_applied = (eps / 100.0) * max_discount
+        final_rate = float(base_rate - discount_applied)
+
+        return round(eps, 2), round(final_rate, 2)
+
     async def generate_quote(
         self, company_id: int, loan_amount: float, term_months: int
     ) -> LoanSimulation:
@@ -33,7 +61,8 @@ class LoanSimulationService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
             )
-        logger.info(f"Starting loan simulation for {company.name} (ID: {company_id})")
+        logger.info(
+            f"Starting loan simulation for {company.name} (ID: {company_id})")
 
         # 2. Fetch Regional Emissions Data (E_loc)
         emissions_query = select(RegionalEmission).where(
@@ -42,15 +71,11 @@ class LoanSimulationService:
         emissions_result = await self.db.execute(emissions_query)
         regional_data = emissions_result.scalars().first()
 
-        # Explicitly cast to float to satisfy the strict type checker
         emissions_kt = (
             float(regional_data.grand_total)
             if regional_data and regional_data.grand_total
             else 1500.0
         )
-
-        # Normalize to a 0-100 score (lower emissions = higher score, capping at 5000kt)
-        e_loc_score = max(0.0, 100.0 - ((emissions_kt / 5000.0) * 100.0))
 
         # 3. Fetch National Energy Data (S_nat)
         target_country = "United Kingdom"
@@ -79,7 +104,6 @@ class LoanSimulationService:
         renew_energy_result = await self.db.execute(renew_energy_query)
         renew_energy_data = renew_energy_result.scalars().first()
 
-        # Explicitly cast to float to prevent ColumnElement[bool] evaluation errors
         total_consumption = (
             float(total_energy_data.energy_consumption)
             if total_energy_data and total_energy_data.energy_consumption
@@ -91,39 +115,27 @@ class LoanSimulationService:
             else 0.0
         )
 
-        if total_consumption > 0:
-            s_nat_score = (renew_consumption / total_consumption) * 100.0
-        else:
-            s_nat_score = 20.0  # Conservative baseline
-
-        # 4. Calculate Environmental Performance Score (EPS)
-        eps = float(
-            (s_nat_score * self.NATIONAL_GRID_WEIGHT)
-            + (e_loc_score * self.LOCATION_EMISSION_WEIGHT)
-        )
-        logger.debug(
-            f"Calculated EPS: {eps} (Sector: {s_nat_score}, Location: {e_loc_score})"
+        # 4. Use the Pure Function for Calculations!
+        eps, final_rate = self.calculate_green_rate(
+            emissions_kt=emissions_kt,
+            total_consumption=total_consumption,
+            renew_consumption=renew_consumption,
+            base_rate=self.BASE_INTEREST_RATE,
+            max_discount=self.MAX_GREEN_DISCOUNT
         )
 
-        # 5. Calculate Margin Ratchet and Final Rate
-        discount_applied = (eps / 100.0) * self.MAX_GREEN_DISCOUNT
-        final_rate = float(self.BASE_INTEREST_RATE - discount_applied)
+        logger.debug(f"Calculated EPS: {eps}, Final Rate: {final_rate}%")
 
-        # TODO: Incorporate to DB?
-        # 6. Calculate Financials (Simple Interest for the simulation)
-        # total_interest = float(
-        #     loan_amount * (final_rate / 100.0) * (term_months / 12.0))
-        # total_payable = float(loan_amount + total_interest)
-
-        # 7. Persist to Database
+        # 5. Persist to Database
         simulation = LoanSimulation(
             company_id=company.id,
             loan_amount=loan_amount,
             term_months=term_months,
             base_rate=self.BASE_INTEREST_RATE,
-            applied_rate=round(final_rate, 2),
-            esg_score=round(eps, 2),
-            estimated_carbon_savings=round((eps / 100) * (loan_amount / 1000), 2),
+            applied_rate=final_rate,
+            esg_score=eps,
+            estimated_carbon_savings=round(
+                (eps / 100) * (loan_amount / 1000), 2),
         )
 
         self.db.add(simulation)

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logger import logger
 from app.models.company import Company
 
-from .opencorporates import OpenCorporatesClient
+from .opencorporates_service import OpenCorporatesClient
 
 
 class CompanyService:
