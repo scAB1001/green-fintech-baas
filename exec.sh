@@ -15,6 +15,11 @@ NC='\033[0m'
 
 COMPOSE_CMD="docker compose"
 
+full_path=$(realpath $0)
+dir_path=$(dirname $full_path)
+out_dir="$dir_path/out"
+mkdir -p "$out_dir"
+
 # --- UI & Interaction Helpers ---
 log_success() { echo -e " ${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"; }
 log_error()   { echo -e " ${RED}${BOLD}✗${NC} ${RED}$1${NC}"; }
@@ -49,13 +54,6 @@ load_env() {
                 export "$clean_line"
             fi
         done < .env
-    else
-        log_warn "No .env file found, using defaults"
-        export POSTGRES_USER="postgres"
-        export POSTGRES_PASSWORD="postgres"
-        export POSTGRES_DB="green_fintech"
-        export POSTGRES_PORT=5432
-        export POSTGRES_INITDB_ARGS="--auth=scram-sha-256"
     fi
 }
 
@@ -83,6 +81,52 @@ _compose_down() {
 _compose_logs() {
     local lines=${2:-20}
     $COMPOSE_CMD logs --tail="$lines" "$1"
+}
+
+# --- API HELPER FUNCTIONS ---
+API_BASE_URL="http://localhost:8080"
+
+# TODO: Use in base
+ENDPOINT_ROOT="api/v1/"
+
+# Usage: _api_get "/endpoint"
+_api_get() {
+    curl -X 'GET' "${API_BASE_URL}$1" \
+        -H 'accept: application/json'
+}
+
+# Usage: _api_post "/endpoint" '{"json": "data"}'
+_api_post() {
+    curl -X 'POST' "${API_BASE_URL}$1" \
+        -H 'Content-Type: application/json' \
+        -H 'accept: application/json' \
+        -d "$2"
+}
+
+# Usage: _api_status "GET" "/endpoint"
+_api_status() {
+    curl -s -o /dev/null \
+        -w "%{http_code}" \
+        -X "$1" "${API_BASE_URL}$2" \
+        -H 'accept: application/json'
+}
+
+# Usage: _api_download "/endpoint" "filename.ext"
+_api_download() {
+    local status
+    local curl_exit
+
+    # -w "%{http_code}" captures ONLY the status code to standard out.
+    status=$(curl -s -w "%{http_code}" -X 'GET' "${API_BASE_URL}$1" -o "$out_dir/$2")
+    curl_exit=$? # Capture the actual exit code of the curl command itself
+
+    # Ensure the HTTP request was OK AND curl successfully wrote the file to disk
+    if [[ "$status" == "200" && "$curl_exit" -eq 0 ]]; then
+        return 0
+    else
+        rm -f "$out_dir/$2"
+        return 1
+    fi
 }
 
 # --- Interactive Menu ---
@@ -184,6 +228,46 @@ exec_cmd() {
             log_info "Exporting dependencies to requirements.txt..."
             uv export --format requirements.txt --output-file requirements.txt >/dev/null
             log_success "Lockfiles updated successfully."
+
+            echo "1. Getting CSV (First hit takes longer, creates cache)"
+            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/export/csv
+
+            echo -e "\n2. Getting CSV (Second hit is INSTANT from cache)"
+            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/export/csv
+
+            echo -e "\n3. Getting PDF (First hit takes longer)"
+            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/1/simulate-loan/1/pdf
+
+            echo -e "\n4. Getting PDF (Second hit is INSTANT from base64 cache)"
+            time curl -s -o /dev/null http://localhost:8080/api/v1/companies/1/simulate-loan/1/pdf
+
+            echo -e "\n5. Proving the keys exist in Redis:"
+            _redis KEYS "*"
+
+            echo -e "\n6. Triggering a cache invalidation (Deleting a company...)"
+            # Assuming ID 2 is safe to delete
+            curl -s -X DELETE http://localhost:8080/api/v1/companies/2
+
+            echo -e "\n7. Proving the CSV and List keys were automatically purged by the DELETE request:"
+            _redis KEYS "*"
+
+            echo "0. Current state:"
+            _redis KEYS "*"
+
+            echo "1. Getting CSV to ensure the cache key exists:"
+            curl -s -o /dev/null http://localhost:8080/api/v1/companies/export/csv
+
+            echo "2. Current Redis Keys (Notice companies:csv is there):"
+            _redis KEYS "*"
+
+            echo -e "\n3. Ingesting a NEW company (Barclays) to trigger cache invalidation..."
+            curl -s -X POST http://localhost:8080/api/v1/companies/ \
+                -H "Content-Type: application/json" \
+                -d '{"company_number": "01026167"}'
+            echo -e "\nIngestion complete."
+
+            echo -e "\n4. Checking Redis Keys again (The CSV key should be gone!):"
+            _redis KEYS "*"
             ;;
 
         "lint")
@@ -259,12 +343,15 @@ exec_cmd() {
             ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
 
             exec_cmd "db-seed"
+            # TODO: Only OUT success if no errors.
             log_success "Postgres service is running successfully."
             ;;
 
         "seed"|"db-seed")
             header "POSTGRES DB INITIALISATION"
-            log_info "Applying migrations..."
+            log_info "Starting PostgreSQL Database..."
+            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
+
             exec_cmd "mig-new"
             exec_cmd "mig-up"
             log_success "Schema up to date"
@@ -273,7 +360,7 @@ exec_cmd() {
             sleep 2
 
             log_info "Seeding data..."
-            uv run python -m scripts.seed_db 2>&1 && log_success "Seeds planted" || log_error "Seeding failed"
+            uv run python -m scripts.seed_db && log_success "Seeds planted" || log_error "Seeding failed"
             log_success "Postgres db fully initialised."
             ;;
 
@@ -338,8 +425,8 @@ exec_cmd() {
             log_info "Number of existing keys..."
             _redis DBSIZE
 
-            log_info "Performing endpoint test with CURL..."
-            curl -X 'GET' 'http://localhost:8080/api/v1/companies/1' -H 'accept: application/json'
+            log_info "Performing endpoint cache test..."
+            _api_get "/api/v1/companies/1"
             echo
 
             log_info "Checking for new keys..."
@@ -358,7 +445,6 @@ exec_cmd() {
 
         "mig-new")
             header "NEW MIGRATION"
-            log_info "Starting PostgreSQL Database..."
             ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
 
             log_info "Generating migration script..."
@@ -412,47 +498,48 @@ exec_cmd() {
             log_info "Waiting for API readiness..."
             sleep 5
 
-            log_info "Performing health test with CURL..."
-            curl -s 'http://localhost:8080/health' || log_error "Health check failed"
-            echo
+            [[ "$(_api_status GET /health)" == "200" ]] && log_success "API Health OK" || log_error "Health check failed"
             log_success "FastAPI service is running successfully."
             ;;
 
         "api-stat")
             header "FASTAPI STATUS"
-            log_info "Performing health test with CURL..."
-            curl -s -X 'GET' 'http://localhost:8080/health' -H 'accept: application/json' || log_error "Failed"
+            log_info "Checking Health Endpoint..."
+            [[ "$(_api_status GET /health)" == "200" ]] && log_success "Health OK" || log_error "Health Failed"
+
+            log_info "Checking OpenAPI Docs..."
+            [[ "$(_api_status GET /docs)" == "200" ]] && log_success "Docs OK" || log_error "Docs unreachable"
+
+            log_info "Ingesting TESCO PLC (00445790)..."
+            _api_post "/api/v1/companies/" '{"company_number": "00445790"}' || log_error "Tesco ingestion failed"
             echo
 
-            log_info "Performing docs test with CURL..."
-            curl -s -o /dev/null -w "%{http_code}" -X 'GET' 'http://localhost:8080/docs' -H 'accept: application/json' | grep -q "200" && log_success "Docs OK" || log_error "Docs unreachable"
+            log_info "Ingesting SHELL PLC (04366849)..."
+            _api_post "/api/v1/companies/" '{"company_number": "04366849"}' || log_error "Shell ingestion failed"
             echo
 
-            log_info "Performing TESCO PLC ingestion via Opencorporates with CURL..."
-            curl -X 'POST' 'http://localhost:8080/api/v1/companies/' \
-                -H 'Content-Type: application/json' \
-                -d '{ "company_number": "00445790" }' || log_error "Ingestion failed"
+            log_info "Simulating Green Loan (Tesco)..."
+            _api_post "/api/v1/companies/1/simulate-loan" '{"loan_amount": 1000000, "term_months": 120}' || log_error "Simulation failed"
             echo
 
-            log_info "Performing SHELL PLC ingestion via Opencorporates with CURL..."
-            curl -X 'POST' 'http://localhost:8080/api/v1/companies/' \
-                -H 'Content-Type: application/json' \
-                -d '{ "company_number": "04366849" }' || log_error "Ingestion failed"
-            echo
+            log_info "Testing CSV Bulk Export..."
+            if _api_download "/api/v1/companies/export/csv" "companies_export.csv"; then
+                log_success "CSV Exported successfully to companies_export.csv"
+            else
+                log_error "CSV Export failed"
+            fi
 
-            log_info "Performing TESCO PLC loan simulation with CURL..."
-            curl -X 'POST' 'http://localhost:8080/api/v1/companies/1/simulate-loan' \
-                -H 'Content-Type: application/json' \
-                -d '{ "loan_amount": 1000000, "term_months": 120 }' || log_error "Simulation failed"
-            echo
+            log_info "Testing PDF Quote Generation..."
+            if _api_download "/api/v1/companies/1/simulate-loan/1/pdf" "green_loan_quote.pdf"; then
+                log_success "PDF Rendered successfully to green_loan_quote.pdf"
+            else
+                log_error "PDF Generation failed"
+            fi
 
             log_info "Checking container logs..."
             _compose_logs api
             log_success "FastAPI status check complete."
             ;;
-
-
-
 
         "run")
             if ask_yes_no "Would you like to run 'kill-ports'?"; then exec_cmd "kill-ports"; fi
@@ -464,7 +551,7 @@ exec_cmd() {
 
         "test")
             if ask_yes_no "Would you like to run 'kill-ports'?"; then exec_cmd "kill-ports"; fi
-
+            log_info "Wiping containers and volumes..."
             _compose_down --remove-orphans -v && log_success "Environment wiped"
 
             header "RUNNING TEST SUITE"
@@ -495,30 +582,12 @@ exec_cmd() {
             header "END-TO-END ARCHITECTURE TEST"
             log_info "1. Testing Database Health..."
             exec_cmd "db-stat"
-            log_success "Database online"
 
             log_info "2. Testing Redis Cache..."
             exec_cmd "rd-stat"
 
-            log_info "3. Testing FastAPI Health..."
+            log_info "3. Testing FastAPI & File Generation..."
             exec_cmd "api-stat"
-
-            log_info "4. Testing OpenCorporates Ingestion (TESCO PLC)..."
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X 'POST' 'http://localhost:8080/api/v1/companies/' -H 'Content-Type: application/json' -d '{"company_number": "00445790"}')
-            if [[ "$HTTP_STATUS" == "201" || "$HTTP_STATUS" == "200" ]]; then
-                log_success "Company ingested successfully"
-            else
-                log_error "Ingestion failed with status $HTTP_STATUS"
-            fi
-
-            log_info "5. Testing Green Loan Simulation..."
-            SIM_RESPONSE=$(curl -s -X 'POST' 'http://localhost:8080/api/v1/companies/4/simulate-loan' -H 'Content-Type: application/json' -d '{"loan_amount": 1000000, "term_months": 120}')
-            if echo "$SIM_RESPONSE" | grep -q "applied_rate"; then
-                log_success "Simulation calculated perfectly!"
-                log_info "Result: " $SIM_RESPONSE
-            else
-                log_error "Simulation failed: $SIM_RESPONSE"
-            fi
 
             header "TEST SUITE COMPLETE"
             ;;
@@ -538,14 +607,14 @@ exec_cmd() {
             log_info "Building and starting all services..."
             if ask_yes_no "Would you like to build the containers from scratch?"; then
                 _compose_build_up || { log_error "Stack failed to start."; exit 1; }
+                exec_cmd "db-seed" || { log_error "Database failed to initialize."; exit 1; }
             else
                 _compose_up || { log_error "Stack failed to start."; exit 1; }
+                if ask_yes_no "Would you like to reinitialise the database?"; then
+                    exec_cmd "db-seed" || { log_error "Database failed to initialize."; exit 1; }
+                fi
             fi
             log_success "Stack running in background"
-
-            if ask_yes_no "Would you like to reinitialise the database?"; then
-                exec_cmd "db-seed" || { log_error "Database failed to initialize."; exit 1; }
-            fi
 
             log_info "Service Status"
             $COMPOSE_CMD ps

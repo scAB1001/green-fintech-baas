@@ -1,9 +1,13 @@
 # tests/integration/api_endpoint_tests/companies_router_test.py
-from unittest.mock import AsyncMock, MagicMock, patch
+import base64
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
+
+from app.core.redis import get_redis_client
+from app.main import app
 
 
 @pytest.mark.asyncio
@@ -94,7 +98,8 @@ async def test_get_company_cache_hit(async_client: AsyncClient, seed_companies):
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_get_company_db_hit_and_cache_set(
-    async_client: AsyncClient, seed_companies
+    async_client: AsyncClient,
+    seed_companies
 ):
     """Proves cache miss hits DB, finds company, and calls set_cached_object."""
     target = seed_companies[0]
@@ -131,7 +136,8 @@ async def test_get_company_not_found_404(async_client: AsyncClient):
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_update_company_success_and_cache_invalidate(
-    async_client: AsyncClient, seed_companies
+    async_client: AsyncClient,
+    seed_companies
 ):
     """Tests successful PATCH, db.commit(), and cache invalidation execution."""
     target = seed_companies[0]
@@ -143,7 +149,11 @@ async def test_update_company_success_and_cache_invalidate(
         )
         assert response.status_code == 200
         assert response.json()["location"] == "New Earth HQ"
-        mock_inv.assert_called_once()  # Proves invalidate_cache was executed
+
+        # Validates both the specific company cache and the CSV cache were purged
+        assert mock_inv.call_count == 2
+        mock_inv.assert_any_call(ANY, f"company:{target.id}")
+        mock_inv.assert_any_call(ANY, "companies:csv")
 
 
 @pytest.mark.asyncio
@@ -168,7 +178,11 @@ async def test_delete_company_success_and_cache_invalidate(
     ) as mock_inv:
         response = await async_client.delete(f"/api/v1/companies/{target.id}")
         assert response.status_code == 204
-        mock_inv.assert_called_once()  # Proves invalidate_cache was executed
+
+        # Validates both the specific company cache and the CSV cache were purged
+        assert mock_inv.call_count == 2
+        mock_inv.assert_any_call(ANY, f"company:{target.id}")
+        mock_inv.assert_any_call(ANY, "companies:csv")
 
 
 @pytest.mark.asyncio
@@ -200,7 +214,9 @@ async def test_export_companies_csv(async_client: AsyncClient, seed_companies):
 @pytest.mark.asyncio
 @pytest.mark.api
 async def test_get_loan_simulation_pdf(
-    async_client: AsyncClient, seed_companies, db_session
+    async_client: AsyncClient,
+    seed_companies,
+    db_session
 ):
     """Tests the application/pdf generation endpoint."""
     target_company = seed_companies[0]
@@ -241,3 +257,99 @@ async def test_get_loan_simulation_pdf(
         f"/api/v1/companies/{target_company.id}/simulate-loan/99999/pdf"
     )
     assert response_no_sim.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_export_companies_csv_cache_hit(async_client: AsyncClient):
+    """
+    Proves the CSV endpoint returns cached text by injecting a mock Redis client.
+    """
+    fake_csv_data = "ID,Company Number,Name\n999,00000000,Cached Corp\n"
+
+    # 1. Create a fake Redis client
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = fake_csv_data
+
+    # 2. Create an async generator to match your get_redis_client signature
+    async def override_get_redis():
+        yield mock_redis
+
+    # 3. Override the dependency in FastAPI
+    app.dependency_overrides[get_redis_client] = override_get_redis
+
+    try:
+        response = await async_client.get("/api/v1/companies/export/csv")
+
+        assert response.status_code == 200
+        assert response.text == fake_csv_data
+        mock_redis.get.assert_called_once_with("companies:csv")
+    finally:
+        # 4. ALWAYS clear the overrides so it doesn't pollute other tests!
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_get_loan_simulation_pdf_cache_hit(
+    async_client: AsyncClient,
+    seed_companies
+):
+    """
+    Proves the PDF endpoint decodes the base64 cache by injecting a mock Redis client.
+    """
+    target = seed_companies[0]
+    fake_pdf_bytes = b"%PDF-1.4 Fake Cached PDF Document"
+    fake_b64 = base64.b64encode(fake_pdf_bytes).decode('utf-8')
+
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = fake_b64
+
+    async def override_get_redis():
+        yield mock_redis
+
+    app.dependency_overrides[get_redis_client] = override_get_redis
+
+    try:
+        # We use simulation ID 1 assuming it exists from our seeded state
+        response = await async_client.get(
+            f"/api/v1/companies/{target.id}/simulate-loan/1/pdf"
+        )
+
+        assert response.status_code == 200
+        assert response.content == fake_pdf_bytes
+        mock_redis.get.assert_called_once_with("simulation:1:pdf")
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.api
+async def test_create_company_invalidates_patterns(
+    async_client: AsyncClient,
+    mock_oc_response_hsbc):
+    """
+    Proves that a POST request successfully triggers pattern invalidation for lists.
+    """
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get, \
+            patch("app.api.v1.endpoints.companies.invalidate_pattern",
+                  new_callable=AsyncMock) as mock_inv_pattern, \
+            patch("app.api.v1.endpoints.companies.invalidate_cache",
+                  new_callable=AsyncMock) as mock_inv_cache:
+
+        # Setup the external API mock
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_oc_response_hsbc
+        mock_get.return_value = mock_response
+
+        response = await async_client.post(
+            "/api/v1/companies/",
+            json={"company_number": "09928412"}
+        )
+
+        assert response.status_code == 201
+
+        # Prove the cache clearing functions were called with the correct arguments
+        mock_inv_pattern.assert_called_once_with(ANY, "companies:list:*")
+        mock_inv_cache.assert_called_once_with(ANY, "companies:csv")
