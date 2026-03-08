@@ -1,4 +1,4 @@
-# src/app/services/loan_simulation_schema.py
+# src/app/schemas/loan_simulation_schema.py
 from pydantic import BaseModel, ConfigDict, Field
 
 

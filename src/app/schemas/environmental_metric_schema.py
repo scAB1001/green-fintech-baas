@@ -14,6 +14,15 @@ class EnvironmentalMetricCreate(EnvironmentalMetricBase):
     company_id: int
 
 
+class EnvironmentalMetricUpdate(BaseModel):
+    """Schema for updating an existing metric (All fields optional)."""
+    reporting_year: int | None = Field(None, ge=2000, le=2100)
+    energy_consumption_mwh: float | None = Field(None, ge=0)
+    carbon_emissions_tco2e: float | None = Field(None, ge=0)
+    water_usage_m3: float | None = Field(None, ge=0)
+    waste_generated_tonnes: float | None = Field(None, ge=0)
+
+
 class EnvironmentalMetricSchema(EnvironmentalMetricBase):
     id: int
     company_id: int
