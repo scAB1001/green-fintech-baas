@@ -129,4 +129,4 @@ The test suite mathematically proves the integrity of the database schema (uniqu
 
 Developed by @scAB1001. Submitted as coursework for the 2026 academic year.
 
-Academic project - University of Leeds COMP3011 - Licensed under MIT 3.0
+Academic project - University of Leeds COMP3011 - Licensed under GPL-3.0

@@ -11,6 +11,10 @@ on:
       - 'LICENSE'
   workflow_dispatch:
 
+permissions:
+  contents: write    # Allows the action to git push the version bump
+  packages: write    # Allows the action to push the Docker image to GHCR
+
 jobs:
   test:
     runs-on: ubuntu-latest
