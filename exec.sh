@@ -307,8 +307,7 @@ exec_cmd() {
             log_info "Starting postgres database..."
             ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
 
-            exec_cmd "db-seed"
-            # TODO: Only OUT success if no errors.
+            exec_cmd "db-seed" || { log_error "Seeding failed"; exit 1; }
             log_success "Postgres service is running successfully."
             ;;
 
