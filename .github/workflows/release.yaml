@@ -41,12 +41,33 @@ jobs:
       run: uv python install 3.12
 
     - name: Install dependencies
-      run: uv sync --frozen --all-groups
+      run: |
+        uv lock
+        uv sync --all-groups
 
     - name: Run tests
       env:
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-      run: uv run pytest --cov=src --cov-report=xml
+      run: uv run pytest --cov --cov-branch --cov-report=xml --junitxml=pytest-results.xml | tee pytest-output.txt
+
+    - name: Upload Test Results Artifact
+      if: always() # Ensures we get the logs even if a test fails!
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-result-tests
+        path: |
+          coverage.xml
+          pytest-results.xml
+          pytest-output.txt
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+        flags: unittests
+        token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true
 
   create-release:
     needs: test

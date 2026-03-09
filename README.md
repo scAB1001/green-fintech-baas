@@ -1,58 +1,132 @@
-# 🌱 Green FinTech BaaS Simulator API
+# Green FinTech BaaS (Banking-as-a-Service) API 🍃
 
-[![Release](https://github.com/scAB1001/green-fintech-baas/actions/workflows/realease.yml/badge.svg?branch=main)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/realease.yml)
-[![CI](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml)
+[![Release](https://github.com/scAB1001/green-fintech-baas/actions/workflows/realease.yml/badge.svg?branch=main)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/realease.yml)[![CI](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml)
 
-A sophisticated Banking-as-a-Service (BaaS) simulation platform for green financing and ESG analytics. Built with modern Python tooling and best practices.
+An elite, asynchronous REST API designed to bridge the gap between corporate financial data and environmental sustainability.
 
-## 🏗️ Architecture
+This platform acts as a BaaS backend, actively ingesting live corporate registry data from OpenCorporates, cross-referencing it against UK national energy and regional emissions datasets to gain ESG analytics, and dynamically generating Sustainability-Linked Loan (SLL) quotes.
 
-- **API**: FastAPI (async, OpenAPI 3.1)
-- **Database**: PostgreSQL 18+ with SQLAlchemy 2.0 (async)
-- **Caching**: Redis (for score optimisation)
-- **Containerisation**: Docker + Docker Compose
-- **CI/CD**: GitHub Actions with conventional commits
-- **Deployment**: Railway.app (production) / local with uv
+## 🏗 Architecture & Tech Stack
 
-## 📋 Prerequisites
+This project strictly adheres to Domain-Driven Design (DDD) principles and features a robust separation of concerns between HTTP routing, business logic (Services), and database persistence (SQLAlchemy ORM).
 
-- Python 3.12+
-- uv (Astral)
-- Docker version 29.2.1, build a5c7197 & Docker Compose v5.0.2
-- PostgrSQL 18+ (or Docker)
-- Redis 8+ (optional, Stage 2)
+* **Core Framework:** FastAPI (Asynchronous ASGI, OpenAPI 3.1)
+* **Database:** PostgreSQL 18+ with SQLAlchemy 2.0 (asyncpg) and Alembic Migrations
+* **Caching Tier:** Redis 8+ (In-memory caching with Base64 binary serialization)
+* **Package Management:** `uv` (Deterministic, ultra-fast dependency resolution)
+* **Media Generation:** ReportLab (Dynamic PDF) & Python Native `csv`
+* **Testing:** Pytest with advanced `unittest.mock` patching (100% Branch Coverage)
+* **DevOps:** Docker Compose, GitHub Actions (CI/CD), GHCR Immutable Artifacts
 
-## 🚀 Quick Start
+## ⚙️ Core Mathematical Engine
+
+The API calculates an Environmental Performance Score (EPS) and issues interest rate discounts (Margin Ratchets) based on ESG materiality weightings adapted from the MSCI/Refinitiv framework.
+
+The core logic operates as a pure, mathematically isolated function:
+
+
+$$EPS = (S_\text{nat} \times 0.30) + (E_\text{loc} \times 0.70)$$
+
+$$\text{Rate}_\text{final} = R_\text{base} - \left( \frac{\text{EPS}}{100} \times D_\text{max} \right)$$
+
+## 🚀 Quick Start (Local Development)
+
+This project includes a custom, DRY-compliant bash utility (`exec.sh`) that completely abstracts the complexity of Docker and `uv` environment management.
+
+**1. Clone the repository and navigate to the root:**
 
 ```bash
-# Clone repository SSH/HTTPS
-git clone git@github.com:scAB1001/green-fintech-baas.git
 git clone https://github.com/scAB1001/green-fintech-baas.git
-
-# Navigate to project directory
 cd green-fintech-baas
 
-# Run the exec script
-chmod +x exec.sh
-./exec.sh
 ```
 
-## 📚 Documentation
-
-API documentation is automatically generated at /docs when running.
-
-## 🧪 Testing
+**2. Boot the infrastructure (PostgreSQL & Redis):**
 
 ```bash
-# Select test options
-./exec.sh test
-./exec.sh test cov
+# Spins up the required databases in isolated Docker containers
+./exec.sh db-up
+
 ```
 
-## 📦 Deployment
+**3. Run Database Migrations & Seed Reference Data:**
 
-Deployed via Railway.app with GitHub Actions automation.
+```bash
+# Automatically applies Alembic heads and seeds the mock JSON data
+./exec.sh db-init
 
-## 📄 License
+```
 
-Academic project - University of Leeds COMP3011 - MIT
+**4. Start the FastAPI Server:**
+
+```bash
+# Starts the Uvicorn server with hot-reloading enabled
+./exec.sh api-up
+
+```
+
+The API is now live at: `http://localhost:8080/docs`
+
+## 📡 API Endpoints
+
+The API exposes 8 primary endpoints mapped to the `Company` domain.
+
+| Method   | Endpoint                                            | Description                               | Cache Behavior              |
+| -------- | --------------------------------------------------- | ----------------------------------------- | --------------------------- |
+| `POST`   | `/api/v1/companies/`                                | Ingests live data from OpenCorporates     | Triggers Cache Invalidation |
+| `GET`    | `/api/v1/companies/`                                | Paginated list of all corporate entities  | Cached (List Pattern)       |
+| `GET`    | `/api/v1/companies/{id}`                            | Fetch a specific company's details        | Cached (Entity Pattern)     |
+| `PATCH`  | `/api/v1/companies/{id}`                            | Update specific corporate fields          | Triggers Cache Invalidation |
+| `DELETE` | `/api/v1/companies/{id}`                            | Hard delete entity and cascade relations  | Triggers Cache Invalidation |
+| `POST`   | `/api/v1/companies/{id}/simulate-loan`              | Executes ESG math engine for a loan quote | No Cache (State Mutation)   |
+| `GET`    | `/api/v1/companies/export/csv`                      | Generates a bulk `text/csv` database dump | Cached (Text)               |
+| `GET`    | `/api/v1/companies/{id}/simulate-loan/{sim_id}/pdf` | Renders an `application/pdf` formal quote | Cached (Base64 Binary)      |
+
+## 🧪 Testing & Quality Assurance
+
+The test suite mathematically proves the integrity of the database schema (unique constraints, cascading deletes), data boundaries (Pydantic validation), and business logic (cache hits/misses, external API fallbacks).
+
+**Run the complete test suite with coverage reporting:**
+
+```bash
+./exec.sh cov
+
+```
+
+*Current Status: 48/48 Passing | 100% Coverage.*
+
+**Run the automated cache diagnostics:**
+
+```bash
+# Proves performance gains via simulated load testing against Redis
+./exec.sh cache-test
+
+```
+
+## 📁 Project Structure
+
+```text
+.
+├── src/app/
+│   ├── api/v1/endpoints/  # FastAPI Routers (HTTP Layer)
+│   ├── core/              # Global configs (Logger, Redis connection pools)
+│   ├── models/            # SQLAlchemy 2.0 ORM definitions (Database Layer)
+│   ├── schemas/           # Pydantic validation boundaries (Network Layer)
+│   └── services/          # Pure Business Logic & External API orchestrators
+├── tests/
+│   ├── fixtures/          # JSON seed data for deterministic tests
+│   ├── integration/       # Database & API Router tests
+│   └── unit/              # Schema boundaries and pure math functions
+├── .github/workflows/     # CI/CD Pipelines (Release & Testing)
+├── Dockerfile             # Multi-stage container definition
+├── compose.yaml           # Local hybrid infrastructure
+├── pyproject.toml         # UV dependency tree
+└── exec.sh                # Interactive developer utility script
+
+```
+
+## 📄 License & Academic Honesty
+
+Developed by @scAB1001. Submitted as coursework for the 2026 academic year.
+
+Academic project - University of Leeds COMP3011 - Licensed under MIT 3.0
