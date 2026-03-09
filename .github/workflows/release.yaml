@@ -56,7 +56,7 @@ jobs:
 
     - name: Upload Test Results Artifact
       if: always() # Ensures we get the logs even if a test fails!
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ci-result-tests
         path: |
@@ -129,6 +129,14 @@ jobs:
         # Safely replaces the version string without needing external Python packages
         sed -i "s/^version = .*/version = \"$VERSION_NUMBER\"/" pyproject.toml
 
+    - name: Install uv
+      if: steps.calculate-version.outputs.should_release == 'true'
+      uses: astral-sh/setup-uv@v5
+
+    - name: Sync uv.lock with new version
+      if: steps.calculate-version.outputs.should_release == 'true'
+      run: uv lock
+
     - name: Generate changelog
       if: steps.calculate-version.outputs.should_release == 'true'
       run: |
@@ -176,7 +184,7 @@ jobs:
         git config --local user.name "GitHub Action"
         NEW_VERSION=${{ steps.calculate-version.outputs.new_version }}
 
-        git add pyproject.toml
+        git add pyproject.toml uv.lock
         git commit -m "chore: release $NEW_VERSION"
         git push origin main
 
@@ -192,7 +200,7 @@ jobs:
 
     - name: Log in to the Container registry
       if: steps.calculate-version.outputs.should_release == 'true'
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -205,7 +213,7 @@ jobs:
 
     - name: Build and push Docker image
       if: steps.calculate-version.outputs.should_release == 'true'
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         push: true
