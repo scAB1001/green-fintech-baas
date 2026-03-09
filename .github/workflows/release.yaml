@@ -198,6 +198,11 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Lowercase Repository Name
+      if: steps.calculate-version.outputs.should_release == 'true'
+      run: |
+        echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
     - name: Build and push Docker image
       if: steps.calculate-version.outputs.should_release == 'true'
       uses: docker/build-push-action@v5
@@ -205,5 +210,5 @@ jobs:
         context: .
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ steps.calculate-version.outputs.new_version }}
+          ghcr.io/${{ env.REPO_LC }}:latest
+          ghcr.io/${{ env.REPO_LC }}:${{ steps.calculate-version.outputs.new_version }}
