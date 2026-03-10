@@ -16,5 +16,77 @@
     "companies_house_id": "WW888888",
     "business_sector": "Energy",
     "location": "Edinburgh"
+  },
+  {
+    "name": "EcoTech Manufacturing Ltd",
+    "companies_house_id": "12345678",
+    "business_sector": "Manufacturing",
+    "location": "Birmingham"
+  },
+  {
+    "name": "BlueTide Marine Power",
+    "companies_house_id": "BT998877",
+    "business_sector": "Renewable Energy",
+    "location": "Bristol"
+  },
+  {
+    "name": "CarbonCapture Systems",
+    "companies_house_id": "CC554433",
+    "business_sector": "Environmental Services",
+    "location": "London"
+  },
+  {
+    "name": "AgriGrow Sustainable",
+    "companies_house_id": "AG112233",
+    "business_sector": "Agriculture",
+    "location": "Norwich"
+  },
+  {
+    "name": "NextGen Batteries",
+    "companies_house_id": "NG776655",
+    "business_sector": "Technology",
+    "location": "Newcastle"
+  },
+  {
+    "name": "AquaPure Solutions",
+    "companies_house_id": "AP889900",
+    "business_sector": "Water Management",
+    "location": "Glasgow"
+  },
+  {
+    "name": "UrbanLeaf Verticals",
+    "companies_house_id": "UL223344",
+    "business_sector": "Agriculture",
+    "location": "Sheffield"
+  },
+  {
+    "name": "GeoHeat Innovations",
+    "companies_house_id": "GH665544",
+    "business_sector": "Energy",
+    "location": "Cardiff"
+  },
+  {
+    "name": "SmartGrid Analytics",
+    "companies_house_id": "SG334455",
+    "business_sector": "FinTech",
+    "location": "Leeds"
+  },
+  {
+    "name": "BioMass Dynamics",
+    "companies_house_id": "BM119988",
+    "business_sector": "Renewable Energy",
+    "location": "Liverpool"
+  },
+  {
+    "name": "TerraFirma Materials",
+    "companies_house_id": "TF445566",
+    "business_sector": "Construction",
+    "location": "Belfast"
+  },
+  {
+    "name": "AeroStream Turbines",
+    "companies_house_id": "AS990011",
+    "business_sector": "Manufacturing",
+    "location": "Nottingham"
   }
 ]
