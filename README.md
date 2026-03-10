@@ -1,8 +1,8 @@
 # Green FinTech BaaS (Banking-as-a-Service) API 🍃
 
+[![Security Scan](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml)
 [![Release](https://github.com/scAB1001/green-fintech-baas/actions/workflows/release.yaml/badge.svg?branch=main)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/release.yaml)
 [![CI](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml)
-[![Security Scan](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml)
 
 An elite, asynchronous REST API designed to bridge the gap between corporate financial data and environmental sustainability.
 
