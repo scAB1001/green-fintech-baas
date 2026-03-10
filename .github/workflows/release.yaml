@@ -171,11 +171,24 @@ jobs:
           echo "---"
           echo ""
           echo "#### Pull the prebuilt Docker Image"
+          echo "The immutable container for this release is hosted on the GCHR (GitHub Container Registry)."
           echo '```bash'
           echo "docker pull ghcr.io/${{ github.repository }}:$NEW_VERSION"
           echo '```'
+          echo "#### Verifying GitHub Artifact Attestations"
+          echo "The Docker images in this release have provenance attestations generated with GitHub Actions. These can be verified by using the GitHub CLI:"
+          echo '```bash'
+          echo "gh attestation verify ghcr.io/${{ github.repository }}:$NEW_VERSION --repo ${{ github.repository }}"
+          echo '```'
 
-        } > RELEASE_NOTES.md
+        } > NEW_RELEASE_NOTES.md
+
+        if [ -f CHANGELOG.md ]; then
+          cat NEW_RELEASE_NOTES.md CHANGELOG.md > TEMP_CHANGELOG.md
+          mv TEMP_CHANGELOG.md CHANGELOG.md
+        else
+          mv NEW_RELEASE_NOTES.md CHANGELOG.md
+        fi
 
     - name: Commit version update
       if: steps.calculate-version.outputs.should_release == 'true'
@@ -184,7 +197,7 @@ jobs:
         git config --local user.name "GitHub Action"
         NEW_VERSION=${{ steps.calculate-version.outputs.new_version }}
 
-        git add pyproject.toml uv.lock
+        git add pyproject.toml uv.lock CHANGELOG.md
         git commit -m "chore: release $NEW_VERSION"
         git push origin main
 
@@ -194,8 +207,7 @@ jobs:
       with:
         tag_name: ${{ steps.calculate-version.outputs.new_version }}
         name: Release ${{ steps.calculate-version.outputs.new_version }}
-        body_path: RELEASE_NOTES.md
-        # Disabled auto-generate so it strictly uses your custom markdown
+        body_path: NEW_RELEASE_NOTES.md
         generate_release_notes: false
 
     - name: Log in to the Container registry
