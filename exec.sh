@@ -198,7 +198,7 @@ show_menu() {
 
     echo -e "\n${BOLD}🌐 Testing, Building and Publishing${NC}"
     echo -e "  17) $(opt "test")        Pytest (Standard)        18) $(opt "e2e")         E2E (End-to-End) Test"
-    echo -e "  19) $(opt "stack")       Full Docker Stack        20) $(opt "package")     Publish to [Test]PyPI"
+    echo -e "  19) $(opt "stack")       Full Docker Stack        20) $(opt "down")        Stop Environment"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
 
@@ -225,7 +225,7 @@ show_menu() {
         17|test)     run_script "test" ;;
         18|e2e)      run_script "e2e" ;;
         19|stack)    run_script "docker-stack" ;;
-        20|package)  run_script "package" ;;
+        20|stack)    run_script "docker-down" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
         *)  log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -628,24 +628,6 @@ exec_cmd() {
             log_info "Stopping Containers..."
             assert_cmd "Environment stopped" "Failed to stop environment" _compose_down
             ;;
-
-        "build")
-            header "PACKAGING FOR PYPI"
-            log_info "Cleaning old build artifacts..."
-            rm -rf dist/ build/ *.egg-info
-
-            log_info "Building wheel and sdist with UV..."
-            assert_cmd "Build artifacts created in dist/" "Build failed" uv build
-            ;;
-
-        "pack"|"package")
-            exec_cmd "build"
-
-            header "PUBLISHING TO TEST PYPI"
-            log_info "Uploading package using Twine via UV..."
-            assert_cmd "Package uploaded successfully" "Twine upload failed" uv run twine upload --repository testpypi dist/* --verbose
-            ;;
-
         *)
             log_error "Command '$1' not found."
             ;;
