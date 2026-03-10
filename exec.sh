@@ -540,6 +540,7 @@ exec_cmd() {
             if ask_yes_no "Would you like to run 'kill-ports'?"; then exec_cmd "kill-ports"; fi
 
             header "LOCAL FASTAPI SERVER"
+            # TODO: Extend redis caching for local hosting.
             log_info "Starting Uvicorn..."
             uv run uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
             ;;

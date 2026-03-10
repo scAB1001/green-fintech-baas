@@ -1,4 +1,15 @@
 # src/app/api/v1/endpoints/companies.py
+"""
+Company and Loan Simulation Endpoints.
+
+
+
+This module defines the primary HTTP routing layer for the `Company` domain.
+It handles corporate data ingestion, ESG loan simulations, bulk CSV exports,
+and dynamic PDF generation. It aggressively utilizes the Redis caching layer
+via the Cache-Aside pattern to minimize database I/O and latency.
+"""
+
 import base64
 import csv
 import io
@@ -34,7 +45,7 @@ from app.services.pdf_service import PDFService
 
 router = APIRouter()
 
-# Type aliases for clean dependency injection
+# Type aliases for clean dependency injection across route signatures
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CacheClient = Annotated[Redis, Depends(get_redis_client)]
 
@@ -43,7 +54,24 @@ CacheClient = Annotated[Redis, Depends(get_redis_client)]
 async def create_company_endpoint(
     request: CompanyCreateRequest, db: DbSession, cache: CacheClient
 ) -> Company | None:
-    """Ingests a new company via the OpenCorporates API."""
+    """
+    Ingests a new company via the OpenCorporates API.
+
+    Delegates the external API orchestration to the CompanyService. Upon
+    successful persistence, it aggressively invalidates relevant cache keys
+    to prevent stale paginated lists or outdated CSV exports.
+
+    Args:
+        request (CompanyCreateRequest): The JSON payload containing the registry ID.
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+
+    Returns:
+        Company | None: The newly persisted SQLAlchemy entity.
+
+    Raises:
+        HTTPException: If the external API fails or data is invalid.
+    """
     try:
         service = CompanyService(db=db, cache=cache)
         company = await service.register_company(request.company_number)
@@ -66,7 +94,21 @@ async def list_companies(
     skip: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(20, ge=1, le=100, description="Pagination limit"),
 ) -> dict[str, str] | list[dict[str, Any]]:
-    """Retrieves a paginated list of all companies (Cached)."""
+    """
+    Retrieves a paginated list of all companies.
+
+    Utilizes the Cache-Aside pattern. The cache key includes pagination
+    parameters to ensure deterministic caching per page view.
+
+    Args:
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+        skip (int): The number of records to skip (offset).
+        limit (int): The maximum number of records to return.
+
+    Returns:
+        list[dict[str, Any]]: A list of serialized Company dictionaries.
+    """
     cache_key = f"companies:list:{skip}:{limit}"
 
     # 1. Try Cache
@@ -79,8 +121,9 @@ async def list_companies(
     result = await db.execute(query)
     companies = result.scalars().all()
 
-    # 3. Populate Cache (60s TTL for lists to balance freshness)
-    companies_data = [CompanySchema.model_validate(c).model_dump() for c in companies]
+    # 3. Populate Cache (60s TTL for lists to balance data freshness and performance)
+    companies_data = [CompanySchema.model_validate(
+        c).model_dump() for c in companies]
     await set_cached_object(cache, cache_key, companies_data, expire=60)
 
     return companies_data
@@ -91,7 +134,20 @@ async def get_company(
     company_id: int, db: DbSession, cache: CacheClient
 ) -> dict[str, Any]:
     """
-    Retrieves a specific company, utilizing Redis for high-performance reads.
+    Retrieves a specific company by its internal ID.
+
+    Utilizes Redis for high-performance reads on frequently accessed entities.
+
+    Args:
+        company_id (int): The internal primary key of the company.
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+
+    Returns:
+        dict[str, Any]: The serialized Company dictionary.
+
+    Raises:
+        HTTPException: 404 if the company does not exist in the database.
     """
     cache_key = f"company:{company_id}"
 
@@ -121,6 +177,24 @@ async def get_company(
 async def update_company(
     company_id: int, company_in: CompanyUpdate, db: DbSession, cache: CacheClient
 ) -> Company:
+    """
+    Updates specific attributes of an existing corporate entity.
+
+    Applies partial updates to the database and proactively invalidates
+    all related cache keys to prevent data drift across the platform.
+
+    Args:
+        company_id (int): The unique identifier of the company.
+        company_in (CompanyUpdate): The payload containing updated fields.
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+
+    Returns:
+        Company: The updated SQLAlchemy model instance.
+
+    Raises:
+        HTTPException: 404 if the company does not exist.
+    """
     query = select(Company).where(Company.id == company_id)
     result = await db.execute(query)
     company = result.scalars().first()
@@ -130,6 +204,7 @@ async def update_company(
             status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
 
+    # Only extract fields that were explicitly set in the request payload
     update_data = company_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(company, field, value)
@@ -137,7 +212,7 @@ async def update_company(
     await db.commit()
     await db.refresh(company)
 
-    # INVALIDATE: Clear entity, lists, and CSVs
+    # INVALIDATE: Clear entity, paginated lists, and CSV dumps
     await invalidate_cache(cache, f"company:{company_id}")
     await invalidate_pattern(cache, "companies:list:*")
     await invalidate_cache(cache, "companies:csv")
@@ -147,6 +222,17 @@ async def update_company(
 
 @router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> None:
+    """
+    Hard-deletes a company and cascades deletions to related records.
+
+    Args:
+        company_id (int): The unique identifier of the company.
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+
+    Raises:
+        HTTPException: 404 if the company does not exist.
+    """
     query = select(Company).where(Company.id == company_id)
     result = await db.execute(query)
     company = result.scalars().first()
@@ -159,7 +245,7 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
     await db.delete(company)
     await db.commit()
 
-    # INVALIDATE: Clear entity, lists, and CSVs
+    # INVALIDATE: Clear entity, paginated lists, and CSV dumps
     await invalidate_cache(cache, f"company:{company_id}")
     await invalidate_pattern(cache, "companies:list:*")
     await invalidate_cache(cache, "companies:csv")
@@ -176,7 +262,23 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
 async def simulate_green_loan(
     company_id: int, request: LoanSimulationCreate, db: DbSession
 ) -> LoanSimulation | None:
-    """Calculates and persists a green loan simulation for a specific company."""
+    """
+    Calculates and persists a dynamic green loan simulation.
+
+    Executes the core ESG mathematical engine via the LoanSimulationService.
+    This endpoint mutates state and is intentionally excluded from caching.
+
+    Args:
+        company_id (int): The unique identifier of the target company.
+        request (LoanSimulationCreate): The loan parameters (amount, term).
+        db (DbSession): The active database session.
+
+    Returns:
+        LoanSimulation | None: The persisted simulation results.
+
+    Raises:
+        HTTPException: 500 if the underlying mathematical simulation fails.
+    """
     try:
         service = LoanSimulationService(db=db)
         return await service.generate_quote(
@@ -206,9 +308,22 @@ async def simulate_green_loan(
     },
 )
 async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
+    """
+    Generates a bulk CSV export of all corporate entities.
+
+    Because CSV generation is computationally expensive at scale, the raw string
+    output is heavily cached in Redis.
+
+    Args:
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+
+    Returns:
+        Response: A raw HTTP response with text/csv media type and attachment headers.
+    """
     cache_key = "companies:csv"
 
-    # 1. Try Cache (CSV is just a string, so we read it directly)
+    # 1. Try Cache (CSV is just a string, so we read it directly from Redis)
     cached_csv = await cache.get(cache_key)
     if cached_csv:
         return Response(
@@ -224,6 +339,7 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     result = await db.execute(query)
     companies = result.scalars().all()
 
+    # Utilize an in-memory string buffer to construct the CSV payload
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["ID", "Company Number", "Name", "Sector", "Location"])
@@ -240,7 +356,8 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     return Response(
         content=csv_data,
         media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="companies_export.csv"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="companies_export.csv"'},
     )
 
 
@@ -259,14 +376,34 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
 async def get_loan_simulation_pdf(
     company_id: int, simulation_id: int, db: DbSession, cache: CacheClient
 ) -> None | Response:
+    """
+    Generates a dynamic PDF formal quote for a loan simulation.
+
+    PDF generation blocks the event loop. To optimize, the binary output is
+    encoded to Base64 (because Redis is configured with decode_responses=True)
+    and cached extensively.
+
+    Args:
+        company_id (int): The unique identifier of the company.
+        simulation_id (int): The unique identifier of the loan simulation.
+        db (DbSession): The active database session.
+        cache (CacheClient): The active Redis client.
+
+    Returns:
+        Response: A raw HTTP response with application/pdf media type.
+
+    Raises:
+        HTTPException: 404 if the company or simulation cannot be found.
+    """
     cache_key = f"simulation:{simulation_id}:pdf"
 
-    # 1. Try Cache (Since decode_responses=True,
-    # we base64 decode the stored string back to bytes)
+    # 1. Try Cache
+    # Since the Redis client decodes responses to UTF-8 strings automatically,
+    # we must base64 decode the stored string back into binary bytes for the PDF.
     cached_pdf_b64 = await cache.get(cache_key)
     if cached_pdf_b64:
         pdf_bytes = base64.b64decode(cached_pdf_b64)
-        pre= "green_loan_quote_"
+        pre = "green_loan_quote_"
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -282,15 +419,19 @@ async def get_loan_simulation_pdf(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    sim_query = select(LoanSimulation).where(LoanSimulation.id == simulation_id)
+    sim_query = select(LoanSimulation).where(
+        LoanSimulation.id == simulation_id)
     sim_result = await db.execute(sim_query)
     simulation = sim_result.scalars().first()
+
     if not simulation or simulation.company_id != company_id:
         raise HTTPException(status_code=404, detail="Simulation not found")
 
+    # Generate the binary PDF payload
     pdf_bytes = PDFService.generate_loan_quote_pdf(company, simulation)
 
-    # 3. Populate Cache (Encode binary bytes to base64 string for Redis)
+    # 3. Populate Cache
+    # Encode binary bytes to a base64 UTF-8 string so Redis can store it safely
     b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
     await cache.setex(cache_key, 86400, b64_pdf)  # Cache for 24 hours
 
