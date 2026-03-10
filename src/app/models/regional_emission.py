@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class RegionalEmission(Base):
+class RegionalEmission(Base):  # type: ignore
     __tablename__ = "regional_emissions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class NationalEnergy(Base):
+class NationalEnergy(Base):  # type: ignore
     __tablename__ = "national_energy"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

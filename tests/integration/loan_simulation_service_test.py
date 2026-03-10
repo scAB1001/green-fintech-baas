@@ -9,30 +9,25 @@ from app.services.loan_simulation_service import LoanSimulationService
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_generate_quote_success_with_reference_data(
-    db_session,
-    seed_companies
-):
+async def test_generate_quote_success_with_reference_data(db_session, seed_companies):
     """
     Test that the DB queries successfully fetch reference data for the math engine.
     """
     target_company = seed_companies[0]  # Has location "Leeds"
 
     # 1. Seed the required reference data for "Leeds" and "United Kingdom"
-    regional = RegionalEmission(
-        local_authority="Leeds", year=2024, grand_total=500.0
-    )
+    regional = RegionalEmission(local_authority="Leeds", year=2024, grand_total=500.0)
     energy_total = NationalEnergy(
         country="United Kingdom",
         energy_type="all_energy_types",
         year=2024,
-        energy_consumption=1000.0
+        energy_consumption=1000.0,
     )
     energy_renew = NationalEnergy(
         country="United Kingdom",
         energy_type="renewables_n_other",
         year=2024,
-        energy_consumption=800.0
+        energy_consumption=800.0,
     )
     db_session.add_all([regional, energy_total, energy_renew])
     await db_session.commit()
@@ -62,8 +57,6 @@ async def test_generate_quote_company_not_found(db_session):
     service = LoanSimulationService(db=db_session)
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.generate_quote(
-            company_id=9999, loan_amount=1000, term_months=12
-        )
+        await service.generate_quote(company_id=9999, loan_amount=1000, term_months=12)
 
     assert exc_info.value.status_code == 404

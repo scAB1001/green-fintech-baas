@@ -7,7 +7,7 @@ from app.database import Base
 from . import Company
 
 
-class EnvironmentalMetric(Base):
+class EnvironmentalMetric(Base):  # type: ignore
     __tablename__ = "environmental_metrics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

@@ -10,7 +10,7 @@ from app.database import Base
 from . import Company
 
 
-class LoanSimulation(Base):
+class LoanSimulation(Base):  # type: ignore
     __tablename__ = "loan_simulations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

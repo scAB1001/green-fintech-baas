@@ -65,7 +65,7 @@ async def list_companies(
     cache: CacheClient,
     skip: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(20, ge=1, le=100, description="Pagination limit"),
-) -> dict[str, str]|list[dict[str, Any]]:
+) -> dict[str, str] | list[dict[str, Any]]:
     """Retrieves a paginated list of all companies (Cached)."""
     cache_key = f"companies:list:{skip}:{limit}"
 
@@ -80,8 +80,7 @@ async def list_companies(
     companies = result.scalars().all()
 
     # 3. Populate Cache (60s TTL for lists to balance freshness)
-    companies_data = [CompanySchema.model_validate(
-        c).model_dump() for c in companies]
+    companies_data = [CompanySchema.model_validate(c).model_dump() for c in companies]
     await set_cached_object(cache, cache_key, companies_data, expire=60)
 
     return companies_data
@@ -128,7 +127,8 @@ async def update_company(
 
     if not company:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+        )
 
     update_data = company_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -153,7 +153,8 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
 
     if not company:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+        )
 
     await db.delete(company)
     await db.commit()
@@ -215,7 +216,7 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
             media_type="text/csv",
             headers={
                 "Content-Disposition": 'attachment; filename="companies_export.csv"'
-            }
+            },
         )
 
     # 2. Database Fallback
@@ -227,8 +228,9 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     writer = csv.writer(output)
     writer.writerow(["ID", "Company Number", "Name", "Sector", "Location"])
     for c in companies:
-        writer.writerow([c.id, c.companies_house_id, c.name,
-                        c.business_sector, c.location])
+        writer.writerow(
+            [c.id, c.companies_house_id, c.name, c.business_sector, c.location]
+        )
 
     csv_data = output.getvalue()
 
@@ -238,9 +240,7 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     return Response(
         content=csv_data,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="companies_export.csv"'
-        }
+        headers={"Content-Disposition": 'attachment; filename="companies_export.csv"'},
     )
 
 
@@ -266,13 +266,13 @@ async def get_loan_simulation_pdf(
     cached_pdf_b64 = await cache.get(cache_key)
     if cached_pdf_b64:
         pdf_bytes = base64.b64decode(cached_pdf_b64)
+        pre= "green_loan_quote_"
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={
-                "Content-Disposition":
-                    f'attachment; filename="green_loan_quote_{company_id}.pdf"'
-            }
+                "Content-Disposition": f'attachment; filename="{pre}{company_id}.pdf"'
+            },
         )
 
     # 2. Database Fallback
@@ -282,8 +282,7 @@ async def get_loan_simulation_pdf(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    sim_query = select(LoanSimulation).where(
-        LoanSimulation.id == simulation_id)
+    sim_query = select(LoanSimulation).where(LoanSimulation.id == simulation_id)
     sim_result = await db.execute(sim_query)
     simulation = sim_result.scalars().first()
     if not simulation or simulation.company_id != company_id:
@@ -292,14 +291,15 @@ async def get_loan_simulation_pdf(
     pdf_bytes = PDFService.generate_loan_quote_pdf(company, simulation)
 
     # 3. Populate Cache (Encode binary bytes to base64 string for Redis)
-    b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+    b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
     await cache.setex(cache_key, 86400, b64_pdf)  # Cache for 24 hours
 
+    pre = "green_loan_quote_"
+    house_id = company.companies_house_id
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition":
-            f'attachment; filename="green_loan_quote_{company.companies_house_id}.pdf"'
-        }
+            "Content-Disposition": f'attachment; filename="{pre}{house_id}.pdf"'
+        },
     )

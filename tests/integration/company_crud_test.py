@@ -101,7 +101,7 @@ async def test_company_unique_constraint(db_session):
         name="First Corp",
         companies_house_id="DUPE1234",
         business_sector="Tech",  # <--- Added to satisfy NOT NULL
-        location="Leeds"
+        location="Leeds",
     )
     db_session.add(company1)
     await db_session.commit()
@@ -110,7 +110,7 @@ async def test_company_unique_constraint(db_session):
         name="Second Corp",
         companies_house_id="DUPE1234",
         business_sector="Tech",  # <--- Added to satisfy NOT NULL
-        location="London"
+        location="London",
     )
     db_session.add(company2)
 
@@ -129,7 +129,7 @@ async def test_environmental_metric_unique_constraint(db_session):
         name="Metric Corp",
         companies_house_id="METR0001",
         business_sector="Finance",  # <--- Added to satisfy NOT NULL
-        location="Bristol"
+        location="Bristol",
     )
     db_session.add(company)
     await db_session.flush()
@@ -162,16 +162,12 @@ async def test_reference_data_persistence(db_session):
         energy_type="Solar",
         year=2024,
         energy_consumption=50.5,
-        co2_emission=0.0
+        co2_emission=0.0,
     )
     db_session.add(energy)
 
     # 2. Regional Emission
-    emission = RegionalEmission(
-        local_authority="Leeds",
-        year=2024,
-        grand_total=1250.5
-    )
+    emission = RegionalEmission(local_authority="Leeds", year=2024, grand_total=1250.5)
     db_session.add(emission)
     await db_session.commit()
 

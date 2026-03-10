@@ -34,7 +34,7 @@ def test_environmental_metric_boundaries():
         "company_id": 1,
         "reporting_year": 2025,
         "energy_consumption_mwh": 100.0,
-        "carbon_emissions_tco2e": 50.0
+        "carbon_emissions_tco2e": 50.0,
     }
 
     # 1. Valid Boundaries (Year 2000, 0 emissions)
@@ -49,8 +49,7 @@ def test_environmental_metric_boundaries():
         invalid_year = base_valid_data.copy()
         invalid_year["reporting_year"] = 1999
         EnvironmentalMetricCreate(**invalid_year)
-    assert "Input should be greater than or equal to 2000" in str(
-        exc_info.value)
+    assert "Input should be greater than or equal to 2000" in str(exc_info.value)
 
     # 3. Invalid Value (Negative Energy)
     with pytest.raises(ValidationError) as exc_info:
@@ -89,7 +88,7 @@ def test_reference_data_year_boundaries():
         energy_type="Solar",
         year=1900,
         energy_consumption=10,
-        co2_emission=1
+        co2_emission=1,
     )
     assert valid_energy.year == 1900
 

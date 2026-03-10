@@ -16,6 +16,7 @@ class RegionalEmissionBase(BaseModel):
 
 class RegionalEmissionSchema(RegionalEmissionBase):
     """Response schema for Regional Emission data."""
+
     id: int
 
     model_config = ConfigDict(from_attributes=True)

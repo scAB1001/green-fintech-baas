@@ -30,7 +30,7 @@ class LoanSimulationService:
         total_consumption: float,
         renew_consumption: float,
         base_rate: float,
-        max_discount: float
+        max_discount: float,
     ) -> tuple[float, float]:
         """Pure function for mathematical ESG rate calculation."""
 
@@ -61,8 +61,7 @@ class LoanSimulationService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
             )
-        logger.info(
-            f"Starting loan simulation for {company.name} (ID: {company_id})")
+        logger.info(f"Starting loan simulation for {company.name} (ID: {company_id})")
 
         # 2. Fetch Regional Emissions Data (E_loc)
         emissions_query = select(RegionalEmission).where(
@@ -121,7 +120,7 @@ class LoanSimulationService:
             total_consumption=total_consumption,
             renew_consumption=renew_consumption,
             base_rate=self.BASE_INTEREST_RATE,
-            max_discount=self.MAX_GREEN_DISCOUNT
+            max_discount=self.MAX_GREEN_DISCOUNT,
         )
 
         logger.debug(f"Calculated EPS: {eps}, Final Rate: {final_rate}%")
@@ -134,8 +133,7 @@ class LoanSimulationService:
             base_rate=self.BASE_INTEREST_RATE,
             applied_rate=final_rate,
             esg_score=eps,
-            estimated_carbon_savings=round(
-                (eps / 100) * (loan_amount / 1000), 2),
+            estimated_carbon_savings=round((eps / 100) * (loan_amount / 1000), 2),
         )
 
         self.db.add(simulation)

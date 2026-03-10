@@ -15,7 +15,7 @@ async def set_cached_object(
     cache: Redis,
     cache_key: str,
     data: dict[str, Any] | list[dict[str, Any]],
-    expire: int = 3600
+    expire: int = 3600,
 ) -> None:
     """Serializes and stores an object in Redis with a TTL."""
     await cache.setex(cache_key, expire, json.dumps(data))

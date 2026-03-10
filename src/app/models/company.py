@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from .loan_simulation import LoanSimulation
 
 
-class Company(Base):
+class Company(Base):  # type: ignore
     """Represents a company/business entity."""
 
     __tablename__ = "companies"
