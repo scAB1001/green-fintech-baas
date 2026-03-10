@@ -37,6 +37,38 @@ ask_yes_no() {
     esac
 }
 
+# Usage: assert_cmd "Success Message" "Error Message" command args...
+assert_cmd() {
+    local success_msg="$1"
+    local error_msg="$2"
+    shift 2
+    # Executing the command. Temporarily suppresses 'set -e' for this statement to allow graceful exit.
+    if "$@"; then
+        [ -n "$success_msg" ] && log_success "$success_msg"
+    else
+        [ -n "$error_msg" ] && log_error "$error_msg"
+        exit 1
+    fi
+}
+
+# Usage: assert_api "GET" "/endpoint" "200" "Success msg" "Error msg"
+assert_api() {
+    local method="$1"
+    local endpoint="$2"
+    local expected_status="$3"
+    local success_msg="$4"
+    local error_msg="$5"
+    local status
+
+    status=$(_api_status "$method" "$endpoint")
+    if [[ "$status" == "$expected_status" ]]; then
+        [ -n "$success_msg" ] && log_success "$success_msg"
+    else
+        [ -n "$error_msg" ] && log_error "$error_msg (HTTP $status)"
+        exit 1
+    fi
+}
+
 # --- Environment Setup ---
 load_env() {
     # Docker configurations
@@ -66,6 +98,10 @@ _redis_it() {
     docker exec -e REDISCLI_AUTH="${REDIS_PASSWORD}" -it green-fintech-cache redis-cli "$@"
 }
 
+_redis_ping() {
+    _redis ping | grep -q "PONG"
+}
+
 _compose_up() {
     $COMPOSE_CMD up -d "$@"
 }
@@ -86,18 +122,15 @@ _compose_logs() {
 # --- API HELPER FUNCTIONS ---
 API_BASE_URL="http://localhost:8080"
 
-# TODO: Use in base
-# ENDPOINT_ROUTER="api/v1/"
-
 # Usage: _api_get "/endpoint"
 _api_get() {
-    curl -X 'GET' "${API_BASE_URL}$1" \
-        -H 'accept: application/json'
+    curl -X 'GET' "${API_BASE_URL}$1" -H 'accept: application/json'
 }
 
 # Usage: _api_post "/endpoint" '{"json": "data"}'
 _api_post() {
-    curl -X 'POST' "${API_BASE_URL}$1" \
+    # Hide raw output by piping to /dev/null but retain curl's exit code for assertion checking
+    curl -s -o /dev/null -X 'POST' "${API_BASE_URL}$1" \
         -H 'Content-Type: application/json' \
         -H 'accept: application/json' \
         -d "$2"
@@ -121,11 +154,9 @@ _api_download() {
     local status
     local curl_exit
 
-    # -w "%{http_code}" captures ONLY the status code to standard out.
     status=$(curl -s -w "%{http_code}" -X 'GET' "${API_BASE_URL}$1" -o "$out_dir/$2")
-    curl_exit=$? # Capture the actual exit code of the curl command itself
+    curl_exit=$?
 
-    # Ensure the HTTP request was OK AND curl successfully wrote the file to disk
     if [[ "$status" == "200" && "$curl_exit" -eq 0 ]]; then
         return 0
     else
@@ -206,13 +237,13 @@ exec_cmd() {
         "init")
             header "INITIALISING PROJECT"
             log_info "Syncing UV environment and installing all groups..."
-            uv sync --all-groups && log_success "UV environment synchronised"
+            assert_cmd "UV environment synchronised" "UV sync failed" uv sync --all-groups
 
             log_info "Installing pre-commit hooks..."
-            uv run pre-commit install && log_success "Git hooks active"
+            assert_cmd "Git hooks active" "Failed to install pre-commit hooks" uv run pre-commit install
 
             log_info "Updating pre-commit hooks..."
-            uv run pre-commit autoupdate && log_success "Pre-commit hooks updated"
+            assert_cmd "Pre-commit hooks updated" "Failed to update hooks" uv run pre-commit autoupdate
 
             exec_cmd "lock"
             log_success "Packages installed successfully."
@@ -221,37 +252,35 @@ exec_cmd() {
         "lock")
             header "LOCKFILE SYNCHRONISATION"
             log_info "Updating UV lock..."
-            uv lock --upgrade && log_success "uv.lock upgraded to LTS"
+            assert_cmd "uv.lock upgraded to LTS" "Lock upgrade failed" uv lock --upgrade
 
             log_info "Checking lockfile integrity..."
-            uv lock --check
+            assert_cmd "Lockfile check passed" "Lockfile integrity check failed" uv lock --check
 
             if ask_yes_no "Would you like to view the dependency tree?"; then
                 uv tree --all-groups
             fi
 
             log_info "Exporting dependencies to requirements.txt..."
-            uv export --format requirements.txt --output-file requirements.txt >/dev/null
-            log_success "Lockfiles updated successfully."
+            assert_cmd "Lockfiles updated successfully." "Export failed" uv export --format requirements.txt --output-file requirements.txt
             ;;
 
         "lint")
             header "LINTING & FORMATTING"
             log_info "Updating pre-commit hooks..."
-            uv run pre-commit autoupdate && log_success "Pre-commit hooks updated"
+            assert_cmd "Pre-commit hooks updated" "Pre-commit autoupdate failed" uv run pre-commit autoupdate
 
             log_info "Running Ruff..."
-            uv run ruff check --fix . && log_success "Ruff finished"
+            assert_cmd "Ruff finished" "Ruff found issues" uv run ruff check --fix .
 
             log_info "Running Black..."
-            uv run black . && log_success "Black finished"
+            assert_cmd "Black finished" "Black formatting failed" uv run black .
 
             log_info "Running Mypy..."
-            uv run mypy . && log_success "Mypy checks passed"
+            assert_cmd "Mypy checks passed" "Mypy found type errors" uv run mypy .
 
             log_info "Running Pre-commit hooks..."
-            uv run pre-commit run --all-files
-            log_success "Linting complete."
+            assert_cmd "Linting complete." "Pre-commit hooks failed" uv run pre-commit run --all-files
             ;;
 
         "clean")
@@ -269,17 +298,17 @@ exec_cmd() {
 
                 log_info "Pruning UV Cache..."
                 if command -v uv >/dev/null 2>&1; then
-                    uv cache prune --force >/dev/null 2>&1 && log_success "UV cache pruned" || log_error "Failed to prune UV cache"
+                    assert_cmd "UV cache pruned" "Failed to prune UV cache" uv cache prune --force
                 else
                     log_warn "UV not found, skipping cache prune..."
                 fi
 
                 log_info "Pruning Docker system..."
-                docker builder prune -f >/dev/null 2>&1 && log_success "Docker artifacts cleaned"
+                assert_cmd "Docker artifacts cleaned" "Docker prune failed" docker builder prune -f
 
                 log_info "Flushing Redis Cache..."
                 if docker ps --format '{{.Names}}' | grep -q "^green-fintech-cache$"; then
-                    _redis FLUSHALL >/dev/null 2>&1 && log_success "Redis cache cleared"
+                    assert_cmd "Redis cache cleared" "Failed to clear Redis" _redis FLUSHALL
                 fi
                 log_success "Workspace cleaned."
             fi
@@ -299,39 +328,39 @@ exec_cmd() {
                 fi
             done
             ;;
+
         "db-up")
             header "POSTGRES SERVICE CREATION"
             log_info "Spinning up Postgres container..."
-            _compose_build_up postgres && log_success "Container started"
+            assert_cmd "Container started" "Failed to start Postgres container" _compose_build_up postgres
 
             log_info "Starting postgres database..."
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
+            assert_cmd "PostgreSQL is active." "PostgreSQL script failed" ./scripts/db-helper.sh start
 
-            exec_cmd "db-seed" || { log_error "Seeding failed"; exit 1; }
+            assert_cmd "Seeding successful" "Database seeding failed" exec_cmd "db-seed"
             log_success "Postgres service is running successfully."
             ;;
 
         "seed"|"db-seed")
             header "POSTGRES DB INITIALISATION"
             log_info "Starting PostgreSQL Database..."
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
+            assert_cmd "PostgreSQL is active." "Database failed to start" ./scripts/db-helper.sh start
 
             exec_cmd "mig-new"
             exec_cmd "mig-up"
-            log_success "Schema up to date"
 
             log_warn "Waiting for PostgreSQL to commit DDL changes..."
             sleep 2
 
             log_info "Seeding data..."
-            uv run python -m scripts.seed_db && log_success "Seeds planted" || log_error "Seeding failed"
+            assert_cmd "Seeds planted" "Database seeding failed" uv run python -m scripts.seed_db
             log_success "Postgres db fully initialised."
             ;;
 
         "db-stat")
             header "DATABASE INSPECTION"
             log_info "Starting PostgreSQL Database..."
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
+            assert_cmd "PostgreSQL is active." "Failed to connect to database" ./scripts/db-helper.sh start
 
             ./scripts/db-helper.sh inspect
 
@@ -345,10 +374,11 @@ exec_cmd() {
             log_warn "This will delete all persistent data in Postgres!"
             if ask_yes_no "Are you sure?"; then
                 log_info "Stopping containers and removing volumes..."
-                _compose_down -v && log_success "Environment wiped"
+                assert_cmd "Environment wiped" "Failed to wipe environment" _compose_down -v
 
                 if ask_yes_no "Would you like to purge Alembic history?"; then
                     rm -rf alembic/versions/*.py
+                    log_success "Alembic history purged"
                 fi
 
                 if ask_yes_no "Would you like to run 'db-up'?"; then
@@ -357,44 +387,23 @@ exec_cmd() {
             fi
             ;;
 
-        "db-sql")
-            header "RUNNING CUSTOM SQL"
-            log_info "Starting PostgreSQL Database..."
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
-            ./scripts/db-helper.sh sql
-            ;;
-
-        "db-psql")
-            header "POSTGRES INTERACTIVE SHELL"
-            log_info "Starting PostgreSQL Database..."
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
-            ./scripts/db-helper.sh psql
-            ;;
-
         "rd-up")
             header "REDIS SERVICE CREATION"
             log_info "Spinning up Redis container..."
-            _compose_build_up redis && log_success "Redis container running"
+            assert_cmd "Redis container running" "Failed to spin up Redis" _compose_build_up redis
 
             log_info "Pinging Redis..."
-            _redis ping | grep -q "PONG" && log_success "Redis is alive" || log_error "Redis unreachable"
+            assert_cmd "Redis is alive" "Redis unreachable" _redis_ping
             log_success "Redis service is running successfully."
             ;;
 
         "rd-stat")
             header "REDIS STATUS"
             log_info "Pinging Redis..."
-            _redis ping | grep "PONG" && log_success "Redis is alive" || log_error "Redis unreachable"
+            assert_cmd "Redis is alive" "Redis unreachable" _redis_ping
 
             log_info "Number of existing keys..."
             _redis DBSIZE
-
-            log_info "Performing endpoint cache test..."
-            _api_get "/api/v1/companies/1"
-            echo
-
-            log_info "Checking for new keys..."
-            _redis KEYS "*" | grep ":" && log_success "Data present" || log_warn "Cache empty"
 
             log_info "Checking container logs..."
             _compose_logs redis
@@ -421,9 +430,7 @@ exec_cmd() {
             _redis KEYS "*"
 
             log_info "6. Ingesting Barclays (01026167) to trigger POST invalidation..."
-            _api_post "/api/v1/companies/" '{"company_number": "01026167"}' > /dev/null
-            echo
-            log_success "Ingestion complete."
+            assert_cmd "Ingestion complete." "Ingestion failed" _api_post "/api/v1/companies/" '{"company_number": "01026167"}'
 
             log_info "7. Checking Redis Keys (The 'companies:csv' key should be purged):"
             _redis KEYS "*"
@@ -432,23 +439,16 @@ exec_cmd() {
             curl -s -o /dev/null -X 'GET' "${API_BASE_URL}/api/v1/companies/export/csv"
 
             log_info "9. Triggering DELETE invalidation (Removing Company ID 2)..."
-            _api_delete "/api/v1/companies/2" > /dev/null
-            log_success "Deletion complete."
+            assert_cmd "Deletion complete." "Deletion failed" _api_delete "/api/v1/companies/2"
 
             log_info "10. Final Redis Keys (The 'companies:csv' key should be purged again):"
             _redis KEYS "*"
             log_success "Cache behavior diagnostics complete."
             ;;
 
-        "rd-cli")
-            header "REDIS INTERACTIVE SHELL"
-            log_info "Connecting to green-fintech-cache..."
-            _redis_it
-            ;;
-
         "mig-new")
             header "NEW MIGRATION"
-            ./scripts/db-helper.sh start && log_success "PostgreSQL is active."
+            assert_cmd "PostgreSQL is active." "Database unavailable" ./scripts/db-helper.sh start
 
             log_info "Generating migration script..."
             read -p "Enter migration message: " msg
@@ -456,6 +456,7 @@ exec_cmd() {
                 uv run alembic revision --autogenerate -m "$msg" && log_success "Migration created in ./alembic/versions"
             else
                 log_error "Migration message cannot be empty."
+                exit 1
             fi
             ;;
 
@@ -465,11 +466,10 @@ exec_cmd() {
             if ask_yes_no "Apply migration to database?"; then
                 read -p "Enter migration tag (optional): " tag
                 if [ -n "$tag" ]; then
-                    uv run alembic upgrade head --tag "$tag" || { log_error "Migrations failed"; exit 1; }
+                    assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head --tag "$tag"
                 else
-                    uv run alembic upgrade head || { log_error "Migrations failed"; exit 1; }
+                    assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head
                 fi
-                log_success "Migration applied successfully."
             else
                 log_warn "Migration not applied. Remember to apply it before running the app!"
             fi
@@ -484,7 +484,7 @@ exec_cmd() {
             read -p "How many revisions to rollback? (Enter number or 'n' to skip): " rev
             if [[ "$rev" =~ ^[0-9]+$ ]]; then
                 log_warn "Rolling back -$rev revision(s)..."
-                uv run alembic downgrade "-$rev" && log_success "Rollback complete"
+                assert_cmd "Rollback complete" "Rollback failed" uv run alembic downgrade "-$rev"
             else
                 log_info "Skipping rollback..."
             fi
@@ -496,48 +496,40 @@ exec_cmd() {
 
             header "FASTAPI SERVICE CREATION"
             log_info "Spinning up FastAPI container..."
-            _compose_build_up api && log_success "Container started"
+            assert_cmd "Container started" "Failed to start FastAPI container" _compose_build_up api
 
             log_info "Waiting for API readiness..."
             sleep 5
 
-            [[ "$(_api_status GET /health)" == "200" ]] && log_success "API Health OK" || log_error "Health check failed"
+            assert_api "GET" "/health" "200" "API Health OK" "Health check failed"
             log_success "FastAPI service is running successfully."
             ;;
 
         "api-stat")
             header "FASTAPI STATUS"
             log_info "Checking Health Endpoint..."
-            [[ "$(_api_status GET /health)" == "200" ]] && log_success "Health OK" || log_error "Health Failed"
+            assert_api "GET" "/health" "200" "Health OK" "Health check failed"
 
             log_info "Checking OpenAPI Docs..."
-            [[ "$(_api_status GET /docs)" == "200" ]] && log_success "Docs OK" || log_error "Docs unreachable"
+            assert_api "GET" "/docs" "200" "Docs OK" "Docs unreachable"
 
             log_info "Ingesting TESCO PLC (00445790)..."
-            _api_post "/api/v1/companies/" '{"company_number": "00445790"}' || log_error "Tesco ingestion failed"
+            assert_cmd "Ingestion successful" "Tesco ingestion failed" _api_post "/api/v1/companies/" '{"company_number": "00445790"}'
             echo
 
             log_info "Ingesting SHELL PLC (04366849)..."
-            _api_post "/api/v1/companies/" '{"company_number": "04366849"}' || log_error "Shell ingestion failed"
+            assert_cmd "Ingestion successful" "Shell ingestion failed" _api_post "/api/v1/companies/" '{"company_number": "04366849"}'
             echo
 
             log_info "Simulating Green Loan (Tesco)..."
-            _api_post "/api/v1/companies/1/simulate-loan" '{"loan_amount": 1000000, "term_months": 120}' || log_error "Simulation failed"
+            assert_cmd "Ingestion successful" "Simulation failed" _api_post "/api/v1/companies/1/simulate-loan" '{"loan_amount": 1000000, "term_months": 120}'
             echo
 
             log_info "Testing CSV Bulk Export..."
-            if _api_download "/api/v1/companies/export/csv" "companies_export.csv"; then
-                log_success "CSV Exported successfully to companies_export.csv"
-            else
-                log_error "CSV Export failed"
-            fi
+            assert_cmd "CSV Exported successfully to companies_export.csv" "CSV Export failed" _api_download "/api/v1/companies/export/csv" "companies_export.csv"
 
             log_info "Testing PDF Quote Generation..."
-            if _api_download "/api/v1/companies/1/simulate-loan/1/pdf" "green_loan_quote.pdf"; then
-                log_success "PDF Rendered successfully to green_loan_quote.pdf"
-            else
-                log_error "PDF Generation failed"
-            fi
+            assert_cmd "PDF Rendered successfully to green_loan_quote.pdf" "PDF Generation failed" _api_download "/api/v1/companies/1/simulate-loan/1/pdf" "green_loan_quote.pdf"
 
             log_info "Checking container logs..."
             _compose_logs api
@@ -555,29 +547,28 @@ exec_cmd() {
         "test")
             if ask_yes_no "Would you like to run 'kill-ports'?"; then exec_cmd "kill-ports"; fi
             log_info "Wiping containers and volumes..."
-            _compose_down --remove-orphans -v && log_success "Environment wiped"
+            assert_cmd "Environment wiped" "Failed to clear test environment" _compose_down --remove-orphans -v
 
             header "RUNNING TEST SUITE"
             if ask_yes_no "Run with coverage report?"; then
                 log_info "Running tests with coverage report..."
-                uv run pytest --cov=src --cov-report=html
-                log_success "Coverage report generated in htmlcov/index.html"
+                assert_cmd "Coverage report generated in htmlcov/index.html" "Tests failed." uv run pytest --cov=src --cov-report=html
 
                 log_info "Opening coverage report in browser..."
                 xdg-open htmlcov/index.html
             else
                 log_info "Running tests (standard mode)..."
-                uv run pytest -v && log_success "Tests passed" || log_error "Tests failed"
+                assert_cmd "Tests passed" "Tests failed." uv run pytest -v
             fi
 
             if ask_yes_no "View specific tests in debug mode?"; then
                 read -p "Specify the marker(s): " markers
-                uv run pytest -m "$markers" -v --log-cli-level=DEBUG
+                assert_cmd "Tests passed" "Tests failed." uv run pytest -m "$markers" -v --log-cli-level=DEBUG
             fi
 
             if ask_yes_no "Run specific test file or directory?"; then
                 read -p "Enter test file or directory within tests/ (e.g., db_test.py): " test_path
-                uv run pytest -v "$test_path"
+                assert_cmd "Tests passed" "Tests failed." uv run pytest -v "$test_path"
             fi
             ;;
 
@@ -591,7 +582,6 @@ exec_cmd() {
 
             log_info "3. Testing FastAPI & File Generation..."
             exec_cmd "api-stat"
-
             header "TEST SUITE COMPLETE"
             ;;
 
@@ -601,20 +591,20 @@ exec_cmd() {
 
             header "DOCKER COMPOSE STACK"
             log_info "Clearing space..."
-            _compose_down --remove-orphans -v && log_success "Environment wiped"
+            assert_cmd "Environment wiped" "Failed to stop containers" _compose_down --remove-orphans -v
 
             if ask_yes_no "Would you like to clear Docker artifacts?"; then
-                docker builder prune -f >/dev/null 2>&1 && log_success "Docker artifacts cleaned"
+                assert_cmd "Docker artifacts cleaned" "Prune failed" docker builder prune -f
             fi
 
             log_info "Building and starting all services..."
             if ask_yes_no "Would you like to build the containers from scratch?"; then
-                _compose_build_up || { log_error "Stack failed to start."; exit 1; }
-                exec_cmd "db-seed" || { log_error "Database failed to initialize."; exit 1; }
+                assert_cmd "Stack built from scratch" "Stack failed to start." _compose_build_up
+                assert_cmd "Database seeded" "Database failed to initialize." exec_cmd "db-seed"
             else
-                _compose_up || { log_error "Stack failed to start."; exit 1; }
+                assert_cmd "Stack up and running" "Stack failed to start." _compose_up
                 if ask_yes_no "Would you like to reinitialise the database?"; then
-                    exec_cmd "db-seed" || { log_error "Database failed to initialize."; exit 1; }
+                    assert_cmd "Database seeded" "Database failed to initialize." exec_cmd "db-seed"
                 fi
             fi
             log_success "Stack running in background"
@@ -636,7 +626,7 @@ exec_cmd() {
             $COMPOSE_CMD ps
 
             log_info "Stopping Containers..."
-            _compose_down && log_success "Environment stopped"
+            assert_cmd "Environment stopped" "Failed to stop environment" _compose_down
             ;;
 
         "build")
@@ -645,7 +635,7 @@ exec_cmd() {
             rm -rf dist/ build/ *.egg-info
 
             log_info "Building wheel and sdist with UV..."
-            uv build && log_success "Build artifacts created in dist/"
+            assert_cmd "Build artifacts created in dist/" "Build failed" uv build
             ;;
 
         "pack"|"package")
@@ -653,7 +643,7 @@ exec_cmd() {
 
             header "PUBLISHING TO TEST PYPI"
             log_info "Uploading package using Twine via UV..."
-            uv run twine upload --repository testpypi dist/* --verbose
+            assert_cmd "Package uploaded successfully" "Twine upload failed" uv run twine upload --repository testpypi dist/* --verbose
             ;;
 
         *)
