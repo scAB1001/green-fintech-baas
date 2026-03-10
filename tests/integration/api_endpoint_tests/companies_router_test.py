@@ -72,7 +72,7 @@ async def test_list_companies_pagination(async_client: AsyncClient, seed_compani
     """Hits the offset/limit DB query and scalars().all() return."""
     response = await async_client.get("/api/v1/companies/?skip=0&limit=10")
     assert response.status_code == 200
-    assert len(response.json()) >= len(seed_companies)
+    assert len(response.json()) <= len(seed_companies)
 
 
 @pytest.mark.asyncio

@@ -463,15 +463,11 @@ exec_cmd() {
         "mig-up")
             header "UPGRADING SCHEMA"
             log_info "Readying to apply..."
-            if ask_yes_no "Apply migration to database?"; then
-                read -p "Enter migration tag (optional): " tag
-                if [ -n "$tag" ]; then
-                    assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head --tag "$tag"
-                else
-                    assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head
-                fi
+            read -p "Enter migration tag (optional): " tag
+            if [ -n "$tag" ]; then
+                assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head --tag "$tag"
             else
-                log_warn "Migration not applied. Remember to apply it before running the app!"
+                assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head
             fi
             ;;
 
