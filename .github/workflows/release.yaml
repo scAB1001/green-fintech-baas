@@ -22,7 +22,7 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_PASSWORD: ${{ secrets.CI_PG_PASSWORD }}
+          POSTGRES_PASSWORD: postgres
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -51,7 +51,7 @@ jobs:
 
     - name: Run tests
       env:
-        DATABASE_URL: postgresql+asyncpg://postgres:${{ secrets.CI_PG_PASSWORD }}@localhost:5432/test_db
+        DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
       run: uv run pytest --cov --cov-branch --cov-report=xml --junitxml=pytest-results.xml | tee pytest-output.txt
 
     - name: Upload Test Results Artifact
