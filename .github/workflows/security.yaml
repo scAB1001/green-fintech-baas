@@ -14,13 +14,13 @@ on:
 jobs:
   gitguardian-scan:
     name: GitGuardian Secret Scan
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
         with:
-          # Fetch depth 0 is critical!
-          # It ensures GitGuardian can scan the entire commit history being pushed, not just the latest snapshot.
+          # Fetch depth 0 ensure GG scans the entire commit history being pushed.
           fetch-depth: 0
 
       - name: Run GitGuardian Scan
