@@ -1,6 +1,8 @@
 ## 📝 Description
 
 **Why is this change needed?**
+* [Add your explanation here...]
+
 * **What does this PR do? (List of changes)**
 * _Added redis cache offsets and pagination_
 * _Removed poetry from workflow *.yaml_
@@ -43,22 +45,27 @@ Closes #
 
 <details>
 <summary><b>🐘 PostgreSQL State</b> (Click to expand)</summary>
+
 </details>
 
 <details>
 <summary><b>🔄 Alembic Migrations</b> (Click to expand)</summary>
+
 </details>
 
 <details>
 <summary><b>⚡ Redis Cache</b> (Click to expand)</summary>
+
 </details>
 
 <details>
 <summary><b>🌐 FastAPI Swagger UI</b> (Click to expand)</summary>
+
 </details>
 
 <details>
 <summary><b>🧪 Pytest Coverage & Results</b> (Click to expand)</summary>
+
 </details>
 
 ## 📦 CI/CD Artifacts

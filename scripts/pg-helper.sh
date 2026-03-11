@@ -228,11 +228,13 @@ test_access() {
 }
 
 inspect_db() {
+    header "DATABASE INSPECTION"
     test_access
     show_config
     active_connections
     db_stats
     table_sizes
+    dump
 }
 
 dump() {

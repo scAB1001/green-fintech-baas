@@ -26,7 +26,7 @@ class Settings(BaseSettings):  # type: ignore[misc]
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     PROJECT_NAME: str = "Green FinTech BaaS Simulator"
-    VERSION: str = "0.1.0"
+    VERSION: str = "1.3.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = Field("development", validation_alias="ENVIRONMENT")
 

@@ -54,11 +54,11 @@ class LoanSimulationService:
 
         Formulas:
         Fallback (Proxy Data):
-        $$EPS = (S_{nat} \cdot 0.30) + (E_{loc} \cdot 0.70)$$
+        $$EPS = (S_{nat} x 0.30) + (E_{loc} x 0.70)$$
 
         Actual (Company Data Present):
         $$
-            EPS = (S_{nat} \cdot 0.30) + (E_{loc} \cdot 0.20) + (C_{score} \cdot 0.50)
+            EPS = (S_{nat} x 0.30) + (E_{loc} x 0.20) + (C_{score} x 0.50)
         $$
 
         Returns:

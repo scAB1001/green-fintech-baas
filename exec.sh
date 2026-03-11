@@ -80,9 +80,9 @@ show_menu() {
         9|rd-up)     header "REDIS";    _rd_exec "start" ;;
         10|rd-stat)  header "REDIS STAT"; _rd_exec "status" ;;
 
-        11|mig-new)  _pg_exec "mig"-new ;;
-        12|mig-up)   _pg_exec "mig"-up ;;
-        13|mig-stat) _pg_exec "mig"-stat ;;
+        11|mig-new)  _pg_exec "mig-new" ;;
+        12|mig-up)   _pg_exec "mig-up" ;;
+        13|mig-stat) _pg_exec "mig-stat" ;;
 
         14|api-up)   header "FASTAPI";  _api_exec "start" ;;
         15|api-stat) header "API E2E";  _api_exec "status" ;;
@@ -197,8 +197,10 @@ exec_cmd() {
          "stack"|"docker-stack")
             _api_exec "kill" || true
             header "DOCKER COMPOSE STACK"
-            log_info "Clearing space..."
-            _compose_wipe
+            if ask_yes_no "Would you like to wipe the environment first?"; then
+                log_info "Clearing space..."
+                _compose_wipe
+            fi
 
             if ask_yes_no "Would you like to build the containers from scratch?"; then
                 assert_cmd "Stack built from scratch" "Stack failed to start." _compose_build_up
@@ -207,9 +209,10 @@ exec_cmd() {
             fi
 
             sleep 3
-            if ask_yes_no "Would you like to reinitialise/seed the database?"; then
+            if ask_yes_no "Would you like to re-initialise/seed the database?"; then
                 _pg_exec "seed"
             fi
+            sleep 2
             log_success "Stack running in background"
             ;;
 
