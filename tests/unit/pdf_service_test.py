@@ -16,7 +16,7 @@ def test_generate_loan_quote_pdf_success():
         name="Test Corp",
         companies_house_id="12345678",
         business_sector="Tech",
-        location="London"
+        location="London",
     )
 
     mock_simulation = LoanSimulation(
@@ -27,12 +27,11 @@ def test_generate_loan_quote_pdf_success():
         base_rate=8.0,
         applied_rate=5.5,
         esg_score=90.0,
-        estimated_carbon_savings=15.0
+        estimated_carbon_savings=15.0,
     )
 
     # 2. Execute the service
-    pdf_bytes = PDFService.generate_loan_quote_pdf(
-        mock_company, mock_simulation)
+    pdf_bytes = PDFService.generate_loan_quote_pdf(mock_company, mock_simulation)
 
     # 3. Verify valid PDF structure
     assert isinstance(pdf_bytes, bytes)

@@ -1,38 +1,67 @@
 # alembic/env.py
+"""
+Alembic Environment Configuration.
+
+This module bootstraps the Alembic migration context. It connects the
+SQLAlchemy ORM metadata from our application to Alembic's inspection engine,
+allowing it to auto-generate and apply DDL (Data Definition Language) changes.
+"""
+
 import sys
 from logging.config import fileConfig
 from pathlib import Path
-
-# 1. FIRST
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# 2. SECOND
+# We must insert the 'src' directory into the system path before Alembic
+# attempts to import our application models. This bridges the gap between
+# the Alembic CLI execution context and our project's Domain-Driven structure.
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from app.core.config import settings
 from app.database.session import Base
 
-# 3. THIRD
-# from app.models import Company, EnvironmentalMetric,
-# LoanSimulation, NationalEnergy, RegionalEmission
+# Alembic needs to load the model definitions into memory so it can compare
+# the ORM state against the actual database schema. (These are usually
+# imported in a central models/__init__.py or listed here).
+# from app.models import Company, EnvironmentalMetric, LoanSimulation, \
+#     NationalEnergy, RegionalEmission
 
+# Access the Alembic Config object, which provides access to the values
+# within the alembic.ini file in use.
 config = context.config
 
+# Interpret the config file for Python logging. This sets up loggers
+# based on the definitions in alembic.ini.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Convert asyncpg URL to standard sync URL for Alembic
+# Alembic natively prefers synchronous database connections for schema inspection
+# and migration generation in this specific setup. We strip the asynchronous
+# driver (+asyncpg) from our application's database URL to force a standard
+# synchronous connection (e.g., via psycopg2) during the migration phase.
 sync_url = str(settings.DATABASE_URL).replace("+asyncpg", "")
 config.set_main_option("sqlalchemy.url", sync_url)
 
-# Add your model's MetaData object for autogenerate support
+# Bind the target metadata so Alembic's 'autogenerate' feature can inspect
+# our SQLAlchemy Base classes and detect schema changes.
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
+    """
+    Executes database migrations in 'offline' mode.
+
+    In this mode, Alembic configures the context with just a URL
+    and does not create a live Engine. It generates raw SQL scripts directly
+    to standard output or a specified file, rather than executing them against
+    the database. This is useful for DBA reviews.
+
+    Returns:
+        None
+    """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -46,8 +75,19 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode using sync engine."""
-    # Use sync engine_from_config, NOT async_engine_from_config
+    """
+    Executes database migrations in 'online' mode.
+
+    In this mode, Alembic creates a synchronous database connection pool
+    and associates it with the migration context. This allows Alembic to
+    inspect the current database state and execute DDL commands directly
+    against the live PostgreSQL instance.
+
+    Returns:
+        None
+    """
+    # We deliberately use the synchronous engine_from_config here,
+    # mapping to the stripped URL we configured above.
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

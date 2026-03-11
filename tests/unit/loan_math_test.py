@@ -10,11 +10,11 @@ def test_calculate_green_rate_optimal_conditions():
     Verify math for a company with low emissions and high renewable national grid.
     """
     eps, final_rate = LoanSimulationService.calculate_green_rate(
-        emissions_kt=500.0,         # Very low regional emissions (E_loc = 90)
+        emissions_kt=500.0,  # Very low regional emissions (E_loc = 90)
         total_consumption=1000.0,
-        renew_consumption=800.0,    # 80% renewable national grid (S_nat = 80)
+        renew_consumption=800.0,  # 80% renewable national grid (S_nat = 80)
         base_rate=8.0,
-        max_discount=2.5
+        max_discount=2.5,
     )
 
     # EPS = (80 * 0.3) + (90 * 0.7) = 24 + 63 = 87
@@ -29,11 +29,11 @@ def test_calculate_green_rate_optimal_conditions():
 def test_calculate_green_rate_worst_conditions():
     """Verify math bounds when emissions exceed the 5000kt cap."""
     eps, final_rate = LoanSimulationService.calculate_green_rate(
-        emissions_kt=6000.0,        # Exceeds cap (E_loc = 0)
+        emissions_kt=6000.0,  # Exceeds cap (E_loc = 0)
         total_consumption=1000.0,
-        renew_consumption=0.0,      # 0% renewable (S_nat = 0)
+        renew_consumption=0.0,  # 0% renewable (S_nat = 0)
         base_rate=8.0,
-        max_discount=2.5
+        max_discount=2.5,
     )
 
     assert eps == 0.0

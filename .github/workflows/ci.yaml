@@ -8,28 +8,13 @@ on:
   schedule:
     - cron: "0 9 * * *"
   workflow_dispatch:
-    inputs:
-      logLevel:
-        description: 'Log level'
-        required: true
-        default: 'warning'
-        type: choice
-        options:
-        - info
-        - warning
-        - debug
-      tags:
-        description: 'Test scenario tags'
-        required: false
-        type: boolean
-      environment:
-        description: 'Environment to run tests against'
-        type: environment
-        required: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   lint-and-test:
+    name: Run Pytest & Coverage
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -85,10 +70,10 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
-  build-and-push:
+  docker-dry-run:
+    name: Verify Docker Build
     needs: lint-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
 
     steps:
     - uses: actions/checkout@v6
@@ -96,26 +81,17 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
 
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v4
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Build and push Docker image
+    - name: Build Docker image (No Push)
       uses: docker/build-push-action@v7
       with:
         context: .
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}:latest
-          ghcr.io/${{ github.repository }}:${{ github.sha }}
+        push: false # Strictly verifies it builds without publishing
+        tags: green-fintech-baas:test-build
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
     - name: Save Build Status
-      run: echo "Docker image built and pushed to GHCR for SHA ${{ github.sha }}" > build-output.txt
+      run: echo "Docker image compiled successfully for SHA ${{ github.sha }}" > build-output.txt
 
     - name: Upload Build Artifact
       if: always()
@@ -124,34 +100,10 @@ jobs:
         name: ci-result-build
         path: build-output.txt
 
-  deploy-staging:
-      needs: [lint-and-test, build-and-push]
-      runs-on: ubuntu-latest
-      if: github.ref == 'refs/heads/main'
-
-      steps:
-        - uses: actions/checkout@v6
-
-        - name: Install Railway CLI
-          run: npm install -g @railway/cli
-
-        - name: Deploy to Railway
-          env:
-            RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          run: |
-            railway up --detach --service green-fintech-api
-            echo "Successfully triggered Railway deployment for SHA ${{ github.sha }}" > deploy-output.txt
-
-        - name: Upload Deploy Artifact
-          if: always()
-          uses: actions/upload-artifact@v7
-          with:
-            name: ci-result-deploy
-            path: deploy-output.txt
-
   merge-results:
-    if: always() # Run even if previous jobs skipped/failed so we always get a consolidated report
-    needs: [lint-and-test, build-and-push, deploy-staging]
+    name: Consolidate CI Artifacts
+    if: always() # Run even if previous jobs skipped/failed to get a consolidated report
+    needs: [lint-and-test, docker-dry-run]
     runs-on: ubuntu-latest
     steps:
       - name: Merge all CI artifacts
