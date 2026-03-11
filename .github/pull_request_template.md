@@ -70,7 +70,9 @@ Closes #
 
 ## 📦 CI/CD Artifacts
 
+* [ ] `scAB1001~green-fintech-baas~KNNWOM.dockerbuild`: [Verify]
 * [ ] `ci-result-tests.zip`: [Insert Link Here]
+* [ ] `ci-result-build.zip`: [Insert Link Here]
 * [ ] `all-ci-results.zip`: [Insert Link Here]
 
 ## 💬 Additional Notes for Reviewer
