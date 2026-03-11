@@ -1,4 +1,3 @@
-# docker-compose.yml
 services:
   postgres:
     image: postgres:18-alpine
@@ -14,6 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Manual override for postgres.conf allows fine-tuning connections/logs
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
       - ./scripts/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
     healthcheck:
@@ -38,14 +38,38 @@ services:
     env_file:
       - .env
     environment:
-      - ENVIRONMENT=production
-      # Connecting via service name 'postgres' (Docker internal DNS)
+      - ENVIRONMENT=production  # Force production env inside the container
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-green_fintech}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@green-fintech-cache:6379
     ports:
-      - "8080:8000" # Maps local 8080 to container 8000
+      - "8080:8000"
+    # Volumes enable watch-like mode (remove for Prod)
     volumes:
-      # HOT RELOAD: Only for local dev. Remove in production Dockerfile/Compose.
       - ./src:/app/src
     networks:
       - green-fintech-network
+
+  redis:
+    image: redis:8-alpine
+    container_name: green-fintech-cache
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "6379:6379"
+    networks:
+      - green-fintech-network
+    restart: unless-stopped
+
+networks:
+  green-fintech-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

@@ -509,6 +509,9 @@ exec_cmd() {
             log_info "Checking OpenAPI Docs..."
             assert_api "GET" "/docs" "200" "Docs OK" "Docs unreachable"
 
+            log_info "Checking OpenAPI Docs..."
+            assert_api "GET" "/redoc" "200" "Redocs OK" "Redocs unreachable"
+
             log_info "Ingesting TESCO PLC (00445790)..."
             assert_cmd "Ingestion successful" "Tesco ingestion failed" _api_post "/api/v1/companies/" '{"company_number": "00445790"}'
             echo
