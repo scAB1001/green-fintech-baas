@@ -110,7 +110,7 @@ repos:
     rev: v1.48.0
     hooks:
       - id: ggshield
-        name: Git Guardian Shield Detection
+        name: ggshield (pre-commit)
         entry: ggshield
         description: Runs ggshield to detect hardcoded secrets.
         stages: [pre-commit]

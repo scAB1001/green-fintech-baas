@@ -91,8 +91,7 @@ show_menu() {
         17|test)     run_script "test" ;;
         18|e2e)      run_script "e2e" ;;
         19|stack)    run_script "docker-stack" ;;
-        20|down) run_script "docker-down" ;;
-
+        20|stack)    run_script "docker-down" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
         *)  log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -218,9 +217,12 @@ exec_cmd() {
 
         "down"|"docker-down")
             header "DOCKER COMPOSE DOWN"
-            _docker_down_all
-            ;;
+            log_info "Viewing existing processes..."
+            $COMPOSE_CMD ps
 
+            log_info "Stopping Containers..."
+            assert_cmd "Environment stopped" "Failed to stop environment" _compose_down
+            ;;
         *)
             log_error "Command '$1' not found."
             ;;
