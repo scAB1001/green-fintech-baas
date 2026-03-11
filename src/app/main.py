@@ -85,8 +85,7 @@ def create_application() -> FastAPI:
     # API Routing Layer.
     # We prefix all company-related endpoints under /api/v1/companies to
     # maintain semantic versioning and logical domain separation.
-    app.include_router(
-        companies.router, prefix="/api/v1/companies", tags=["companies"])
+    app.include_router(companies.router, prefix="/api/v1/companies", tags=["companies"])
 
     return app
 

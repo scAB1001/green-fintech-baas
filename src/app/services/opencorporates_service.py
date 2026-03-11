@@ -29,6 +29,7 @@ class OpenCorporatesClient:
         _lock (asyncio.Lock):
             Global lock to prevent race conditions during rate limiting.
     """
+
     BASE_URL = "https://api.opencorporates.com/v0.4"
 
     # Class-level state to enforce the 2 calls/s limit globally across the app.
@@ -48,8 +49,7 @@ class OpenCorporatesClient:
             time_since_last = now - self._last_call_time
             if time_since_last < 0.5:
                 sleep_time = 0.5 - time_since_last
-                logger.debug(
-                    f"Rate limiting active: sleeping for {sleep_time:.2f}s")
+                logger.debug(f"Rate limiting active: sleeping for {sleep_time:.2f}s")
                 await asyncio.sleep(sleep_time)
             OpenCorporatesClient._last_call_time = time.time()
 
@@ -88,14 +88,14 @@ class OpenCorporatesClient:
 
         logger.info(
             f"Calling external API: \
-                OpenCorporates ({jurisdiction_code}/{company_number})")
+                OpenCorporates ({jurisdiction_code}/{company_number})"
+        )
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
                 response = await client.get(url, params=params)
             except httpx.RequestError as e:
-                logger.error(
-                    f"Network error while connecting to OpenCorporates: {e!s}")
+                logger.error(f"Network error while connecting to OpenCorporates: {e!s}")
                 raise HTTPException(
                     status_code=502, detail="External API network error."
                 ) from None
@@ -104,7 +104,8 @@ class OpenCorporatesClient:
             if response.status_code == 404:
                 logger.warning(
                     f"OpenCorporates lookup failed: \
-                        Company {company_number} not found.")
+                        Company {company_number} not found."
+                )
                 raise HTTPException(
                     status_code=404, detail=f"Company {company_number} not found."
                 )
@@ -113,19 +114,21 @@ class OpenCorporatesClient:
                 # instead of a 429, so we map it for better API semantics.
                 logger.error(
                     "OpenCorporates rate limit exceeded or \
-                        API key invalid (403 Forbidden).")
+                        API key invalid (403 Forbidden)."
+                )
                 raise HTTPException(
                     status_code=429, detail="OpenCorporates API rate limit exceeded."
                 )
             elif response.status_code != 200:
                 logger.error(
                     f"OpenCorporates returned unexpected status code: \
-                        {response.status_code}")
-                raise HTTPException(
-                    status_code=502, detail="External API error.")
+                        {response.status_code}"
+                )
+                raise HTTPException(status_code=502, detail="External API error.")
 
             logger.debug(
-                f"Successfully retrieved OpenCorporates payload for {company_number}")
+                f"Successfully retrieved OpenCorporates payload for {company_number}"
+            )
             data = response.json()
 
             # Navigate the nested JSON structure: results -> company

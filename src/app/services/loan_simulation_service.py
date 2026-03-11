@@ -77,10 +77,8 @@ class LoanSimulationService:
         # 3. Company Specific Score (C_score) & Dynamic EPS Calculation
         if company_emissions_tco2e is not None:
             # Assume 500 tCO2e is a benchmark threshold for an average SME
-            c_score = max(
-                0.0, 100.0 - ((company_emissions_tco2e / 500.0) * 100.0))
-            eps = float((s_nat_score * 0.30) +
-                        (e_loc_score * 0.20) + (c_score * 0.50))
+            c_score = max(0.0, 100.0 - ((company_emissions_tco2e / 500.0) * 100.0))
+            eps = float((s_nat_score * 0.30) + (e_loc_score * 0.20) + (c_score * 0.50))
         else:
             # Fallback to pure proxy baseline
             eps = float((s_nat_score * 0.30) + (e_loc_score * 0.70))
@@ -102,8 +100,7 @@ class LoanSimulationService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
             )
-        logger.info(
-            f"Starting loan simulation for {company.name} (ID: {company_id})")
+        logger.info(f"Starting loan simulation for {company.name} (ID: {company_id})")
 
         # Fetch Company Specific Metrics (C_score data)
         metric_query = (
@@ -116,9 +113,7 @@ class LoanSimulationService:
         latest_metric = metric_result.scalars().first()
 
         company_emissions_tco2e = (
-            latest_metric.carbon_emissions_tco2e
-            if latest_metric
-            else None
+            latest_metric.carbon_emissions_tco2e if latest_metric else None
         )
 
         # Fetch Regional Emissions Data (E_loc)
@@ -206,6 +201,7 @@ class LoanSimulationService:
         await self.db.refresh(simulation)
 
         logger.info(
-            f"Simulation complete. Applied Rate: {final_rate}%, ESG Score: {eps}")
+            f"Simulation complete. Applied Rate: {final_rate}%, ESG Score: {eps}"
+        )
 
         return simulation

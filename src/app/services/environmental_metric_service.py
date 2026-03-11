@@ -54,8 +54,7 @@ class EnvironmentalMetricService:
 
         # 3. Construct and persist
         new_metric = EnvironmentalMetric(
-            company_id=company_id,
-            **metric_in.model_dump()
+            company_id=company_id, **metric_in.model_dump()
         )
 
         self.db.add(new_metric)

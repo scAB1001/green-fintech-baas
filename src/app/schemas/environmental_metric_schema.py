@@ -42,6 +42,7 @@ class EnvironmentalMetricCreate(EnvironmentalMetricBase):
     Attributes:
         company_id (int): The primary key of the parent Company.
     """
+
     company_id: int
 
 

@@ -25,8 +25,7 @@ from app.core.config import settings
 # with a standard synchronous PostgreSQL prefix.
 database_url = str(settings.DATABASE_URL)
 if database_url and "+asyncpg" not in database_url:
-    database_url = database_url.replace(
-        "postgresql://", "postgresql+asyncpg://")
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
 
 # Initialize the core SQLAlchemy asynchronous engine.
 # - pool_pre_ping: Tests connections for liveness before checkout to prevent

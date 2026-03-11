@@ -52,7 +52,7 @@ async def test_create_company_http_exception(async_client: AsyncClient):
 async def test_create_company_generic_exception(async_client: AsyncClient):
     """Hits the 'except Exception' fallback block."""
     with patch(
-        "" "app.services.company_service.CompanyService.register_company",
+        "app.services.company_service.CompanyService.register_company",
         new_callable=AsyncMock,
     ) as mock_reg:
         mock_reg.side_effect = Exception("Catastrophic Database Failure")
@@ -81,7 +81,7 @@ async def test_get_company_cache_hit(async_client: AsyncClient, seed_companies):
     """Hits the 'if cached_company: return cached_company' block."""
     target = seed_companies[0]
     with patch(
-        "" "app.api.v1.endpoints.companies.get_cached_object", new_callable=AsyncMock
+        "app.api.v1.endpoints.companies.get_cached_object", new_callable=AsyncMock
     ) as mock_cache:
         mock_cache.return_value = {
             "id": target.id,
@@ -104,14 +104,13 @@ async def test_get_company_db_hit_and_cache_set(
     target = seed_companies[0]
     with (
         patch(
-            "" "app.api.v1.endpoints.companies.get_cached_object",
+            "app.api.v1.endpoints.companies.get_cached_object",
             new_callable=AsyncMock,
         ) as mock_get,
         patch(
             "app.api.v1.endpoints.companies.set_cached_object", new_callable=AsyncMock
         ) as mock_set,
     ):
-
         mock_get.return_value = None  # Force Cache Miss
 
         response = await async_client.get(f"/api/v1/companies/{target.id}")
@@ -125,7 +124,7 @@ async def test_get_company_db_hit_and_cache_set(
 async def test_get_company_not_found_404(async_client: AsyncClient):
     """Proves result.scalars().first() returning None triggers the 404 block."""
     with patch(
-        "" "app.api.v1.endpoints.companies.get_cached_object", new_callable=AsyncMock
+        "app.api.v1.endpoints.companies.get_cached_object", new_callable=AsyncMock
     ) as mock_get:
         mock_get.return_value = None
         response = await async_client.get("/api/v1/companies/99999")
@@ -356,7 +355,6 @@ async def test_create_company_invalidates_patterns(
             "app.api.v1.endpoints.companies.invalidate_cache", new_callable=AsyncMock
         ) as mock_inv_cache,
     ):
-
         # Setup the external API mock
         mock_response = MagicMock()
         mock_response.status_code = 200

@@ -35,8 +35,7 @@ class NationalEnergy(Base):  # type: ignore
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     # Indexed for fast lookups when filtering by nation during math simulations
-    country: Mapped[str] = mapped_column(
-        String(255), index=True, nullable=False)
+    country: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     energy_type: Mapped[str] = mapped_column(String(100), nullable=False)
 
     # Indexed because we frequently query baseline data for a specific reporting year

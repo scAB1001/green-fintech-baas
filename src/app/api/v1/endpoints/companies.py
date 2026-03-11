@@ -127,8 +127,7 @@ async def list_companies(
     companies = result.scalars().all()
 
     # 3. Populate Cache (60s TTL for lists to balance data freshness and performance)
-    companies_data = [CompanySchema.model_validate(
-        c).model_dump() for c in companies]
+    companies_data = [CompanySchema.model_validate(c).model_dump() for c in companies]
     await set_cached_object(cache, cache_key, companies_data, expire=60)
 
     return companies_data
@@ -361,8 +360,7 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     return Response(
         content=csv_data,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="companies_export.csv"'},
+        headers={"Content-Disposition": 'attachment; filename="companies_export.csv"'},
     )
 
 
@@ -424,8 +422,7 @@ async def get_loan_simulation_pdf(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    sim_query = select(LoanSimulation).where(
-        LoanSimulation.id == simulation_id)
+    sim_query = select(LoanSimulation).where(LoanSimulation.id == simulation_id)
     sim_result = await db.execute(sim_query)
     simulation = sim_result.scalars().first()
 
@@ -445,9 +442,7 @@ async def get_loan_simulation_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{pre}{house_id}.pdf"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{pre}{house_id}.pdf"'},
     )
 
 
@@ -458,10 +453,7 @@ async def get_loan_simulation_pdf(
     summary="Add Yearly ESG Metrics",
 )
 async def add_company_metrics(
-    company_id: int,
-    request: EnvironmentalMetricBase,
-    db: DbSession,
-    cache: CacheClient
+    company_id: int, request: EnvironmentalMetricBase, db: DbSession, cache: CacheClient
 ) -> EnvironmentalMetricSchema:
     """
     Submits actual yearly environmental performance data for a company.
@@ -507,8 +499,7 @@ async def list_company_metrics(
 
     # 3. Populate Cache
     metrics_data = [
-        EnvironmentalMetricSchema.model_validate(m).model_dump()
-        for m in metrics
+        EnvironmentalMetricSchema.model_validate(m).model_dump() for m in metrics
     ]
     await set_cached_object(cache, cache_key, metrics_data)
 

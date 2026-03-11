@@ -36,8 +36,7 @@ class CompanyBase(BaseModel):
         ..., min_length=1, max_length=255, examples=["EcoTech Manufacturing Ltd"]
     )
     companies_house_id: CH_ID = Field(..., examples=["12345678"])
-    business_sector: str | None = Field(
-        None, max_length=100, examples=["Energy"])
+    business_sector: str | None = Field(None, max_length=100, examples=["Energy"])
     location: str | None = Field(None, max_length=100, examples=["Birmingham"])
     opencorporates_url: str | None = Field(
         None, description="Mandatory attribution link"
@@ -56,9 +55,7 @@ class CompanyCreateRequest(BaseModel):
         company_number (CH_ID): The strictly validated 8-character ID.
     """
 
-    company_number: CH_ID = Field(
-        ..., description="The 8-character Companies House ID"
-    )
+    company_number: CH_ID = Field(..., description="The 8-character Companies House ID")
 
 
 class CompanyUpdate(BaseModel):

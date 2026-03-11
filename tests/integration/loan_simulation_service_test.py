@@ -18,8 +18,7 @@ async def test_generate_quote_fallback_proxy_data(db_session, seed_companies):
     target_company = seed_companies[0]  # Assuming this company has location "Leeds"
 
     # 1. Seed Reference Data
-    regional = RegionalEmission(
-        local_authority="Leeds", year=2024, grand_total=500.0)
+    regional = RegionalEmission(local_authority="Leeds", year=2024, grand_total=500.0)
     energy_total = NationalEnergy(
         country="United Kingdom",
         energy_type="all_energy_types",
@@ -65,8 +64,7 @@ async def test_generate_quote_with_primary_company_data(db_session, seed_compani
     target_company = seed_companies[0]
 
     # 1. Seed Reference Data
-    regional = RegionalEmission(
-        local_authority="Leeds", year=2024, grand_total=500.0)
+    regional = RegionalEmission(local_authority="Leeds", year=2024, grand_total=500.0)
     energy_total = NationalEnergy(
         country="United Kingdom",
         energy_type="all_energy_types",
@@ -85,7 +83,7 @@ async def test_generate_quote_with_primary_company_data(db_session, seed_compani
         company_id=target_company.id,
         reporting_year=2024,
         energy_consumption_mwh=120.0,
-        carbon_emissions_tco2e=250.0  # Used to calculate C_score
+        carbon_emissions_tco2e=250.0,  # Used to calculate C_score
     )
 
     db_session.add_all([regional, energy_total, energy_renew, company_metric])

@@ -61,19 +61,16 @@ class LoanSimulation(Base):  # type: ignore
     base_rate: Mapped[float] = mapped_column(Float, nullable=False)
     applied_rate: Mapped[float] = mapped_column(Float, nullable=False)
     esg_score: Mapped[float] = mapped_column(Float, nullable=False)
-    estimated_carbon_savings: Mapped[float |
-                                     None] = mapped_column(Float, nullable=True)
+    estimated_carbon_savings: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Metadata
     # func.now() delegates the timestamp generation directly to PostgreSQL,
     # avoiding timezone/clock drift issues across distributed FastAPI workers.
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    simulation_parameters: Mapped[str | None] = mapped_column(
-        String, nullable=True)
+    simulation_parameters: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Relationship
-    company: Mapped["Company"] = relationship(
-        back_populates="loan_simulations")
+    company: Mapped["Company"] = relationship(back_populates="loan_simulations")
 
     def __repr__(self) -> str:
         """

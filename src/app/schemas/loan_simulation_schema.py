@@ -64,9 +64,7 @@ class LoanSimulationResponse(LoanSimulationBase):
 
     id: int
     company_id: int
-    base_rate: float = Field(
-        ..., description="The standard market interest rate (%)"
-    )
+    base_rate: float = Field(..., description="The standard market interest rate (%)")
     applied_rate: float = Field(
         ..., description="The discounted interest rate applied post ESG assessment (%)"
     )

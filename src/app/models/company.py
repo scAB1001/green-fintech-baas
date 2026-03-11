@@ -56,8 +56,7 @@ class Company(Base):  # type: ignore
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_sector: Mapped[str] = mapped_column(String(100))
     location: Mapped[str] = mapped_column(String(100))
-    opencorporates_url: Mapped[str | None] = mapped_column(
-        String(255), nullable=True)
+    opencorporates_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # We enforce referential integrity at the ORM level using cascade deletes.
     # If a Company record is hard-deleted, all of its associated SLL quotes

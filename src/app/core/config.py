@@ -67,9 +67,7 @@ class Settings(BaseSettings):  # type: ignore[misc]
             return explicit_url
 
         host = (
-            "green-fintech-db"
-            if self.is_production
-            else "localhost"
+            "green-fintech-db" if self.is_production else "localhost"
         )  # pragma: no cover
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
@@ -86,9 +84,7 @@ class Settings(BaseSettings):  # type: ignore[misc]
             return explicit_url
 
         host = (
-            "green-fintech-db"
-            if self.is_production
-            else "localhost"
+            "green-fintech-db" if self.is_production else "localhost"
         )  # pragma: no cover
         return f"redis://:{self.REDIS_PASSWORD}@{host}:6379"
 

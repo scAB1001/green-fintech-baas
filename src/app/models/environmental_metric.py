@@ -51,18 +51,15 @@ class EnvironmentalMetric(Base):  # type: ignore
     energy_consumption_mwh: Mapped[float] = mapped_column(Float, default=0.0)
     carbon_emissions_tco2e: Mapped[float] = mapped_column(Float, default=0.0)
     water_usage_m3: Mapped[float | None] = mapped_column(Float, nullable=True)
-    waste_generated_tonnes: Mapped[float |
-                                   None] = mapped_column(Float, nullable=True)
+    waste_generated_tonnes: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Business Rule: A company can only report one set of metrics per year.
     # We enforce this mathematically at the database level using a composite constraint.
     __table_args__ = (
-        UniqueConstraint("company_id", "reporting_year",
-                         name="uq_company_year"),
+        UniqueConstraint("company_id", "reporting_year", name="uq_company_year"),
     )
 
-    company: Mapped["Company"] = relationship(
-        back_populates="environmental_metrics")
+    company: Mapped["Company"] = relationship(back_populates="environmental_metrics")
 
     def __repr__(self) -> str:
         """

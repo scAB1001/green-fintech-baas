@@ -54,25 +54,26 @@ class CompanyService:
         Raises:
             HTTPException: Propagated from oc_client if company is not found globally.
         """
-        logger.info(
-            f"Initiating registration for company number: {company_number}")
+        logger.info(f"Initiating registration for company number: {company_number}")
 
         # 1. Idempotency Check
         # We perform a primary lookup on the unique Companies House ID to prevent
         # duplicate entries and unnecessary external API billing.
-        query = select(Company).where(
-            Company.companies_house_id == company_number)
+        query = select(Company).where(Company.companies_house_id == company_number)
         result = await self.db.execute(query)
         existing_company = result.scalars().first()
 
         if existing_company:
-            logger.info(f"Company {company_number} found in local database. "
-                        "Skipping external API call.")
+            logger.info(
+                f"Company {company_number} found in local database. "
+                "Skipping external API call."
+            )
             return existing_company
 
         # 2. External Data Fetch
-        logger.debug(f"Company {company_number} not found locally. "
-                     "Fetching from OpenCorporates.")
+        logger.debug(
+            f"Company {company_number} not found locally. Fetching from OpenCorporates."
+        )
         raw_data = await self.oc_client.get_company_details(company_number)
 
         # 3. Defensive Data Transformation
@@ -91,8 +92,10 @@ class CompanyService:
         address_dict = raw_data.get("registered_address") or {}
         location = address_dict.get("locality") or "Unknown"
 
-        logger.debug(f"Transformed data for {company_number}: Sector='{sector}', "
-                     f"Location='{location}'")
+        logger.debug(
+            f"Transformed data for {company_number}: Sector='{sector}', "
+            f"Location='{location}'"
+        )
 
         # 4. Persistence
         # Constructing the Entity using the normalized data.
@@ -109,7 +112,9 @@ class CompanyService:
         # Refresh to load the DB-generated PK (ID)
         await self.db.refresh(new_company)
 
-        logger.info(f"Successfully registered new company: '{new_company.name}' "
-                    f"(ID: {new_company.id})")
+        logger.info(
+            f"Successfully registered new company: '{new_company.name}' "
+            f"(ID: {new_company.id})"
+        )
 
         return new_company

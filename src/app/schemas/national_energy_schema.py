@@ -28,12 +28,8 @@ class NationalEnergyBase(BaseModel):
 
     # Explicit descriptions ensure the auto-generated Swagger UI accurately
     # reflects the physical units of measurement used by the business logic.
-    energy_consumption: float = Field(
-        ..., description="Energy consumption in TWh"
-    )
-    co2_emission: float = Field(
-        ..., description="Emissions in MtCO2e"
-    )
+    energy_consumption: float = Field(..., description="Energy consumption in TWh")
+    co2_emission: float = Field(..., description="Emissions in MtCO2e")
 
 
 class NationalEnergySchema(NationalEnergyBase):
