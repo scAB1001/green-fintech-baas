@@ -37,7 +37,7 @@ jobs:
         fetch-depth: 0
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
 
@@ -131,7 +131,7 @@ jobs:
 
     - name: Install uv
       if: steps.calculate-version.outputs.should_release == 'true'
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@v7
 
     - name: Sync uv.lock with new version
       if: steps.calculate-version.outputs.should_release == 'true'
