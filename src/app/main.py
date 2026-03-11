@@ -1,5 +1,17 @@
 # src/app/main.py
-"""Main FastAPI application factory."""
+"""
+Main FastAPI Application Factory.
+
+
+
+This module serves as the entry point for the Green FinTech BaaS Simulator.
+It utilizes the 'Application Factory' pattern to initialize the FastAPI
+instance, configure essential middleware (CORS), and mount the domain-specific
+API routers.
+
+This structure facilitates better testability by allowing the creation of
+isolated app instances for integration testing.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +23,18 @@ from app.core.config import settings
 
 
 def create_application() -> FastAPI:
-    """Application factory pattern."""
+    """
+    Constructs and configures the FastAPI application instance.
+
+    Configures:
+        - Global metadata (Title, Version).
+        - CORS Middleware: Relaxed for local development, restricted for production.
+        - Routing: Mounts versioned API endpoints.
+        - Documentation: Enables Swagger (/docs) and ReDoc (/redoc).
+
+    Returns:
+        FastAPI: The fully configured application instance.
+    """
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
@@ -20,7 +43,9 @@ def create_application() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # Set up CORS
+    # Cross-Origin Resource Sharing (CORS) Configuration.
+    # In development, we allow all origins to facilitate frontend prototyping.
+    # In production, this is limited to prevent unauthorised cross-site requests.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.is_development else [],
@@ -31,7 +56,12 @@ def create_application() -> FastAPI:
 
     @app.get("/")
     async def root() -> dict[str, str]:
-        """Root endpoint with API information."""
+        """
+        Root entry point for the API.
+
+        Provides basic environment metadata and links to the interactive
+        OpenAPI documentation.
+        """
         return {
             "message": "Welcome to the Green FinTech BaaS Simulator API",
             "docs": "/docs",
@@ -41,15 +71,24 @@ def create_application() -> FastAPI:
 
     @app.get("/health", tags=["Monitoring"])
     async def health_check() -> dict[str, str]:
-        """Health check endpoint for monitoring."""
+        """
+        Liveness probe for orchestration and monitoring.
+
+        Used by tools like Docker, Kubernetes, or Uptime monitors to verify
+        that the service is operational and capable of handling traffic.
+        """
         return {
             "status": "healthy",
             "version": settings.VERSION,
         }
 
+    # API Routing Layer.
+    # We prefix all company-related endpoints under /api/v1/companies to
+    # maintain semantic versioning and logical domain separation.
     app.include_router(companies.router, prefix="/api/v1/companies", tags=["companies"])
 
     return app
 
 
+# The singleton application instance used by the ASGI server (Uvicorn/Gunicorn).
 app = create_application()

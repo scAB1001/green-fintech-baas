@@ -1,12 +1,24 @@
 # Green FinTech BaaS (Banking-as-a-Service) API 🍃
 
+[![Security Scan](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml)
 [![Release](https://github.com/scAB1001/green-fintech-baas/actions/workflows/release.yaml/badge.svg?branch=main)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/release.yaml)
 [![CI](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/ci.yaml)
 [![Security Scan](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml/badge.svg?branch=develop)](https://github.com/scAB1001/green-fintech-baas/actions/workflows/security.yaml)
 
 An elite, asynchronous REST API designed to bridge the gap between corporate financial data and environmental sustainability.
 
-This platform acts as a BaaS backend, actively ingesting live corporate registry data from OpenCorporates, cross-referencing it against UK national energy and regional emissions datasets to gain ESG analytics, and dynamically generating Sustainability-Linked Loan (SLL) quotes.
+**The Problem:** Traditional lenders lack the specialized data models to accurately assess the financial risk of sustainability-focused projects, creating a "green financing gap."
+**The Solution:** This platform acts as a BaaS backend, actively ingesting live corporate registry data from OpenCorporates, cross-referencing it against UK national energy and regional emissions datasets to gain ESG analytics, and dynamically generating Sustainability-Linked Loan (SLL) quotes.
+
+## 📚 Academic Deliverables & Documentation
+
+As per the COMP3011 coursework requirements, all formal academic justifications and comprehensive technical manuals are located within this repository:
+
+* **📄 [Technical Report (PDF)](https://www.google.com/search?q=./Technical_Report.pdf):** Academic justification of the tech stack, architectural design choices, GenAI usage logs, and evaluation of limitations.
+* **📄 [API Documentation (PDF)](https://www.google.com/search?q=./API_Documentation.pdf):** The formal OpenAPI specification, documenting all endpoints, parameters, request/response JSON payloads, and error codes.
+* **📘 [Developer Wiki](https://www.google.com/search?q=https://github.com/scAB1001/green-fintech-baas/wiki):** The operational manual containing the Development Setup Guide, CI/CD Automation Guide, Testing Strategy, and Agile Project Management records.
+
+---
 
 ## 🏗 Architecture & Tech Stack
 
@@ -26,10 +38,9 @@ The API calculates an Environmental Performance Score (EPS) and issues interest 
 
 The core logic operates as a pure, mathematically isolated function:
 
+$$EPS=(S_\text{nat}\times0.30)+(E_\text{loc}\times0.70)$$
 
-$$EPS = (S_\text{nat} \times 0.30) + (E_\text{loc} \times 0.70)$$
-
-$$\text{Rate}_\text{final} = R_\text{base} - \left( \frac{\text{EPS}}{100} \times D_\text{max} \right)$$
+$$\text{Rate}_\text{final}=R_\text{base}-\left(\frac{\text{EPS}}{100}\times D_\text{max}\right)$$
 
 ## 🚀 Quick Start (Local Development)
 
@@ -67,11 +78,11 @@ cd green-fintech-baas
 
 ```
 
-The API is now live at: `http://localhost:8080/docs`
+The interactive API documentation is now live at: `http://localhost:8080/docs`
 
 ## 📡 API Endpoints
 
-The API exposes 8 primary endpoints mapped to the `Company` domain.
+The API exposes 8 primary endpoints mapped to the `Company` domain. For full request/response payloads, please refer to the attached `API_Documentation.pdf`.
 
 | Method   | Endpoint                                            | Description                               | Cache Behavior              |
 | -------- | --------------------------------------------------- | ----------------------------------------- | --------------------------- |
@@ -101,7 +112,7 @@ The test suite mathematically proves the integrity of the database schema (uniqu
 
 ```bash
 # Proves performance gains via simulated load testing against Redis
-./exec.sh cache-test
+./exec.sh rd-stat
 
 ```
 
@@ -130,5 +141,4 @@ The test suite mathematically proves the integrity of the database schema (uniqu
 ## 📄 License & Academic Honesty
 
 Developed by @scAB1001. Submitted as coursework for the 2026 academic year.
-
 Academic project - University of Leeds COMP3011 - Licensed under GPL-3.0

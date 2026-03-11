@@ -1,52 +1,18 @@
 #!/bin/bash
+# scripts/pg-helper.sh
+
 set -e
 
-# --- Configuration & Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-ORANGE='\033[0;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m'
+# --- Configuration ---
+# Import the common library relative to this script's location
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-DB_CONTAINER="green-fintech-db"
-COMPOSE_CMD="docker compose"
-
-# --- UI Helpers ---
-log_warn()      { echo -e " ${YELLOW}${BOLD}⚠${YELLOW} $1${NC}"; }
-log_serious()   { echo -e " ${ORANGE}${BOLD}⚠${ORANGE} $1${NC}"; }
-log_error()     { echo -e " ${RED}${BOLD}✗${RED} $1${NC}"; }
-log_success()   { echo -e " ${GREEN}${BOLD}✓${NC} ${GREEN}$1${NC}"; }
-log_data()      { echo -e " ${NC}${BOLD}  >${NC} $1${NC}"; }
-log_info()      { echo -e " ${BLUE}${BOLD}i${BLUE} $1${NC}"; }
-
-# --- Environment Setup ---
-load_env() {
-    if [ -f .env ]; then
-        # Read .env line by line, ignoring comments and empty lines
-        while IFS= read -r line || [ -n "$line" ]; do
-            if [[ ! "$line" =~ ^\s*# ]] && [[ -n "$line" ]]; then
-                clean_line=$(echo "$line" | sed 's/\s*#.*$//' | tr -d '\r')
-                export "$clean_line"
-            fi
-        done < .env
-    else
-        log_warn "No .env file found, using defaults"
-        export POSTGRES_USER=postgres
-        export POSTGRES_PASSWORD=postgres
-        export POSTGRES_DB=green_fintech
-        export POSTGRES_PORT=5432
-        export POSTGRES_INITDB_ARGS="--auth=scram-sha-256"
-    fi
-
-    # Exported globally for external tools if needed
-    export DATABASE_URL="postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}"
-}
+PG_CONTAINER="green-fintech-db"
 
 show_env() {
     echo
-    log_info "Current Environment Configuration:"
+    log_info "Current Postgres Configuration:"
+    log_data "Container: ${PG_CONTAINER}"
     log_data "User: ${POSTGRES_USER}"
     log_data "Database: ${POSTGRES_DB}"
     log_data "Port: ${POSTGRES_PORT}"
@@ -59,16 +25,20 @@ _exec_db() {
 }
 
 _psql() {
-    _exec_db "${DB_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" "$@"
+    _exec_db -it "${PG_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" "$@"
+}
+
+_psql_query() {
+    _exec_db -it "${PG_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "$1"
 }
 
 _is_ready() {
-    docker exec "${DB_CONTAINER}" pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1
+    docker exec "${PG_CONTAINER}" pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1
 }
 
 # --- Service Management ---
 check_postgres() {
-    if docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
+    if docker ps --format '{{.Names}}' | grep -q "^${PG_CONTAINER}$"; then
         if _is_ready; then
             log_success "PostgreSQL is running and accepting connections"
             return 0
@@ -84,11 +54,12 @@ check_postgres() {
 
 start() {
     log_warn "Starting PostgreSQL with SCRAM-SHA-256 authentication..."
-    $COMPOSE_CMD up -d postgres && log_success "Postgres service up"
+    _compose_up "postgres" && log_success "Postgres service up"
 
     log_warn "Waiting for PostgreSQL to be ready..."
     for i in {1..30}; do
         if _is_ready; then
+            echo
             log_success "PostgreSQL is ready"
             return 0
         fi
@@ -101,35 +72,83 @@ start() {
 
 stop() {
     log_warn "Stopping PostgreSQL..."
-    $COMPOSE_CMD stop postgres
+    _compose_stop "postgres"
     log_success "PostgreSQL stopped"
 }
 
-reset() {
+wipe() {
     log_serious "WARNING: This will delete ALL data!"
-    read -p " Are you sure? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        $COMPOSE_CMD down -v
+    if ask_yes_no "Are you sure?"; then
+        _compose_down "postgres"
         start
-        log_success "Database reset complete"
+        log_success "Database wipe complete"
     fi
 }
 
-# --- Database Operations ---
-psql() {
-    _exec_db -it "${DB_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
+# --- Alembic Migrations ---
+mig_new() {
+    header "NEW MIGRATION"
+    assert_cmd "PostgreSQL is active." "Database unavailable" start
+
+    log_info "Generating migration script..."
+    read -p "Enter migration message: " msg
+    if [ -n "$msg" ]; then
+        uv run alembic revision --autogenerate -m "$msg" && log_success "Migration created in ./alembic/versions"
+    else
+        log_error "Migration message cannot be empty."
+        exit 1
+    fi
+    mig_up
 }
 
-logs() {
-    docker logs -f "${DB_CONTAINER}"
+mig_up() {
+    header "UPGRADING SCHEMA"
+    log_info "Readying to apply..."
+    read -p "Enter migration tag (optional): " tag
+    if [ -n "$tag" ]; then
+        assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head --tag "$tag"
+    else
+        assert_cmd "Migration applied successfully." "Migrations failed" uv run alembic upgrade head
+    fi
 }
 
+mig_stat() {
+    header "MIGRATION STATUS"
+    log_info "Checking migration history..."
+    uv run alembic history --verbose | head -n 15
+
+    log_info "Rolling back to specified revision..."
+    read -p "How many revisions to rollback? (Enter number or 'n' to skip): " rev
+    if [[ "$rev" =~ ^[0-9]+$ ]]; then
+        log_warn "Rolling back -$rev revision(s)..."
+        assert_cmd "Rollback complete" "Rollback failed" uv run alembic downgrade "-$rev"
+    else
+        log_info "Skipping rollback..."
+    fi
+    log_success "Migration status check complete."
+}
+
+seed() {
+    header "POSTGRES DB INITIALISATION"
+    log_info "Starting PostgreSQL Database..."
+    assert_cmd "PostgreSQL is active." "Database failed to start" start
+
+    mig_new
+
+    log_warn "Waiting for PostgreSQL to commit DDL changes..."
+    sleep 2
+
+    log_info "Seeding data..."
+    assert_cmd "Seeds planted" "Database seeding failed" uv run python -m scripts.seed_db
+    log_success "Postgres db fully initialised."
+}
+
+# --- Database Backup & Restore ---
 backup() {
     mkdir -p backups
     local backup_file="backups/backup_$(date +%Y%m%d_%H%M%S).sql"
     log_warn "Creating backup: $backup_file..."
-    _exec_db "${DB_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "$backup_file"
+    _exec_db "${PG_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "$backup_file"
     log_success "Backup created: $backup_file ($(du -h "$backup_file" | cut -f1))"
 }
 
@@ -139,11 +158,9 @@ restore() {
         log_error "Error: Backup file not found: $backup_file"
         exit 1
     fi
-    log_serious "WARNING: This will overwrite current data! Continue? (y/N)"
-    read -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        cat "$backup_file" | _exec_db -i "${DB_CONTAINER}" psql -U "${POSTGRES_USER}" "${POSTGRES_DB}"
+    log_serious "WARNING: This will overwrite current data!"
+    if ask_yes_no "Continue?"; then
+        cat "$backup_file" | _exec_db -i "${PG_CONTAINER}" psql -U "${POSTGRES_USER}" "${POSTGRES_DB}"
         log_success "Restore complete"
     fi
 }
@@ -160,14 +177,11 @@ show_config() {
 
 run_sql() {
     local query="$1"
-
-    # Single execution
     if [ -n "$query" ]; then
         _psql -t -c "$query" 2>/dev/null || log_error "Error running SQL command"
         return
     fi
 
-    # Interactive mode
     log_info "Interactive SQL Mode. Type 'q' or 'quit' to exit."
     while true; do
         read -p "SQL> " query
@@ -198,16 +212,15 @@ table_sizes() {
 
 test_access() {
     log_info "Testing PostgreSQL access methods:"
-
     echo -n "  Method 1 (PGPASSWORD Env Var): "
-    if _psql -c "SELECT 1" >/dev/null 2>&1; then
+    if _exec_db -it "${PG_CONTAINER}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
         log_success "Success"
     else
         log_error "Failed"
     fi
 
     echo -n "  Method 2 (URI string): "
-    if _exec_db "${DB_CONTAINER}" psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
+    if _exec_db "${PG_CONTAINER}" psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}" -c "SELECT 1" >/dev/null 2>&1; then
         log_success "Success"
     else
         log_error "Failed"
@@ -215,11 +228,24 @@ test_access() {
 }
 
 inspect_db() {
+    header "DATABASE INSPECTION"
     test_access
     show_config
     active_connections
     db_stats
     table_sizes
+    dump
+}
+
+dump() {
+    log_info "1. Registered Companies:"
+    _psql_query "SELECT id, companies_house_id, name, location FROM companies LIMIT 10;"
+    echo
+    log_info "2. Primary Environmental Metrics:"
+    _psql_query "SELECT id, company_id, reporting_year, carbon_emissions_tco2e FROM environmental_metrics LIMIT 10;"
+    echo
+    log_info "3. Generated Loan Simulations:"
+    _psql_query "SELECT id, company_id, loan_amount, applied_rate, esg_score FROM loan_simulations LIMIT 10;"
 }
 
 # --- Execution Entry ---
@@ -229,41 +255,29 @@ main() {
     case "${1:-}" in
         start) start ;;
         stop) stop ;;
-        restart) stop; sleep 2; start ;;
-        st|status) check_postgres ;;
-        reset) reset ;;
-        psql) psql ;;
-        logs) logs ;;
+        status) check_postgres ;;
+        wipe) wipe ;;
+        psql) _psql ;;
+        logs) docker logs -f "${PG_CONTAINER}" ;;
+
+        mig-new) mig_new ;;
+        mig-up) mig_up ;;
+        mig-stat) mig_stat ;;
+        seed) seed ;;
+
         backup) backup ;;
         restore) restore "$2" ;;
-        cn|config) show_config ;;
+
+        config) show_config ;;
         connections) active_connections ;;
         stats) db_stats ;;
         tables) table_sizes ;;
         sql) run_sql "$2" ;;
         test-access) test_access ;;
         inspect) inspect_db ;;
+        dump) dump ;;
         *)
-            echo "Usage: $0 {start|stop|restart|status|reset|psql|logs|backup|restore|config|connections|stats|tables|sql|test-access|inspect}"
-            echo
-            echo "Commands:"
-            log_info "start        - Start PostgreSQL with SCRAM-SHA-256 auth"
-            log_info "stop         - Stop PostgreSQL container"
-            log_info "restart      - Restart PostgreSQL container"
-            log_info "status       - Check if PostgreSQL is running"
-            log_info "reset        - WARNING: Delete all data and start fresh"
-            log_info "psql         - Connect to PostgreSQL with psql"
-            log_info "logs         - Show PostgreSQL logs"
-            log_info "backup       - Create a database backup"
-            log_info "restore      - Restore from a backup file"
-            log_info "config       - Show current configuration"
-            log_info "connections  - Show active database connections"
-            log_info "stats        - Show database statistics"
-            log_info "tables       - Show table sizes"
-            log_info "sql 'query'  - Run a SQL query"
-            log_info "test-access  - Test all access methods"
-            log_info "inspect      - Inspect db"
-            echo
+            echo "Usage: $0 {start|stop|status|wipe|psql|logs|mig-new|mig-up|mig-stat|seed|backup|restore|config|connections|stats|tables|sql|test-access|inspect|dump}"
             exit 1
             ;;
     esac

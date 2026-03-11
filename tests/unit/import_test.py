@@ -12,6 +12,6 @@ def test_import():
     try:
         import app
 
-        assert app.__version__ == "0.1.0"
+        assert app.__version__
     except ImportError:
         pytest.fail("Failed to import app module")

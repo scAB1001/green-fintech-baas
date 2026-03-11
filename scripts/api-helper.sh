@@ -1,0 +1,237 @@
+#!/bin/bash
+# scripts/api-helper.sh
+
+set -e
+
+# --- Configuration ---
+# Import the common library relative to this script's location
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+
+API_CONTAINER="green-fintech-api"
+
+show_env() {
+    echo
+    log_info "Current API Configuration:"
+    log_data "Container: ${API_CONTAINER}"
+    log_data "Root URL (${API_PORT}): ${ROOT_URL}"
+    log_data "Host URL (V1): ${HOST_URL}"
+    log_data "Output Dir: ${OUT_DIR}"
+}
+
+# --- API Curl Wrappers ---
+# Note: Since $1 might be "/companies", we strip leading slashes
+# from the argument so the url resolves cleanly to "http.../api/v1/companies"
+# Usage: _api_get "/endpoint" | "endpoint"
+_api_get() {
+    local endpoint="${1#/}"
+    curl -s -X 'GET' "${HOST_URL}${endpoint}" -H 'accept: application/json'
+}
+
+# Usage: _api_post "/endpoint" | "endpoint" '{"json": "data"}'
+_api_post() {
+    local endpoint="${1#/}"
+    curl -s -o /dev/null -X 'POST' "${HOST_URL}${endpoint}" \
+        -H 'Content-Type: application/json' \
+        -H 'accept: application/json' \
+        -d "$2"
+}
+
+# Usage: _api_delete "/endpoint" | "endpoint"
+_api_delete() {
+    local endpoint="${1#/}"
+    curl -s -o /dev/null -X 'DELETE' "${HOST_URL}${endpoint}" -H 'accept: application/json'
+}
+
+# Usage: _api_status "GET" "/endpoint" | "endpoint"
+_api_status() {
+    local method="$1"
+    local endpoint="${2#/}"
+    curl -s -o /dev/null -w "%{http_code}" -X "$method" "${HOST_URL}${endpoint}" -H 'accept: application/json'
+}
+
+# Special wrapper for root endpoints like /health, /docs
+_root_status() {
+    local method="$1"
+    local endpoint="${2#/}"
+    curl -s -o /dev/null -w "%{http_code}" -X "$method" "${ROOT_URL}/${endpoint}" -H 'accept: application/json'
+}
+
+# Usage: _api_download "/endpoint" | "endpoint" "filename.ext"
+_api_download() {
+    local status
+    local curl_exit
+    local endpoint="${1#/}"
+
+    status=$(curl -s -w "%{http_code}" -X 'GET' "${HOST_URL}${endpoint}" -o "$OUT_DIR/$2")
+    curl_exit=$?
+
+    if [[ "$status" == "200" && "$curl_exit" -eq 0 ]]; then
+        return 0
+    else
+        rm -f "$OUT_DIR/$2"
+        return 1
+    fi
+}
+
+# Usage: assert_api "GET" "/endpoint" "200" "Success msg" "Error msg"
+assert_api() {
+    local method="$1"
+    local endpoint="$2"
+    local expected_status="$3"
+    local success_msg="$4"
+    local error_msg="$5"
+
+    local status=$(_api_status "$method" "$endpoint")
+    if [[ "$status" == "$expected_status" ]]; then
+        [ -n "$success_msg" ] && log_success "$success_msg"
+    else
+        [ -n "$error_msg" ] && log_error "$error_msg (HTTP $status)"
+        exit 1
+    fi
+}
+
+# Usage: assert_api "GET" "/health" "200" "Success msg" "Error msg"
+assert_root_api() {
+    local method="$1"
+    local endpoint="$2"
+    local expected_status="$3"
+    local success_msg="$4"
+    local error_msg="$5"
+
+    local status=$(_root_status "$method" "$endpoint")
+    if [[ "$status" == "$expected_status" ]]; then
+        [ -n "$success_msg" ] && log_success "$success_msg"
+    else
+        [ -n "$error_msg" ] && log_error "$error_msg (HTTP $status)"
+        exit 1
+    fi
+}
+
+# --- Port Management ---
+kill_ports() {
+    header "PORT KILLER"
+    for port in 8000 8080; do
+        log_info "Checking Port $port..."
+        if lsof -i :$port -t >/dev/null 2>&1; then
+            log_warn "Port $port is in use. Killing process..."
+            sudo lsof -i :$port -t | xargs sudo kill -9 2>/dev/null || true
+            log_success "Port $port is free"
+        else
+            log_success "Port $port is free"
+        fi
+    done
+}
+
+# --- Service Operations ---
+start() {
+    if ask_yes_no "Would you like to check and kill conflicting ports (8000/8080)?"; then
+        kill_ports
+    fi
+
+    header "FASTAPI SERVICE CREATION"
+    log_info "Spinning up FastAPI container..."
+    assert_cmd "Container started" "Failed to start FastAPI container" _compose_build_up api
+
+    log_warn "Waiting for API readiness..."
+    for i in {1..15}; do
+        if [[ $(_root_status "GET" "/health") == "200" ]]; then
+            log_success "FastAPI is ready!"
+            return 0
+        fi
+        echo -n "."
+        sleep 1
+    done
+    log_error "Timed out waiting for FastAPI to boot"
+    return 1
+}
+
+stop() {
+    header "STOPPING FASTAPI"
+    _compose_stop api
+    log_success "FastAPI stopped"
+}
+
+run_local() {
+    if ask_yes_no "Would you like to check and kill conflicting ports?"; then
+        kill_ports
+    fi
+    header "LOCAL FASTAPI SERVER"
+    log_info "Starting Uvicorn..."
+    uv run uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+}
+
+# --- End-to-End Testing ---
+diagnostics() {
+    header "FASTAPI END-TO-END STATUS"
+
+    log_info "Checking Health Endpoint..."
+    assert_root_api "GET" "/health" "200" "Health OK" "Health check failed"
+
+    log_info "Checking OpenAPI Docs..."
+    assert_root_api "GET" "/docs" "200" "Docs OK" "Docs unreachable"
+
+    log_info "Checking ReDoc..."
+    assert_root_api "GET" "/redoc" "200" "Redocs OK" "Redocs unreachable"
+
+    # Notice how we now just pass "companies" rather than "/api/v1/companies"
+    log_info "Ingesting TESCO PLC (00445790)..."
+    assert_cmd "Ingestion successful" "Tesco ingestion failed" _api_post "companies" '{"company_number": "00445790"}'
+    echo
+
+    log_info "Ingesting SHELL PLC (04366849)..."
+    assert_cmd "Ingestion successful" "Shell ingestion failed" _api_post "companies" '{"company_number": "04366849"}'
+    echo
+
+    log_info "Submitting Primary ESG Metrics (Tesco - 2024)..."
+    assert_cmd "Metrics added successfully" "Metrics submission failed" _api_post "companies/1/metrics" '{"reporting_year": 2024, "energy_consumption_mwh": 4500.5, "carbon_emissions_tco2e": 250.0, "water_usage_m3": 500.0, "waste_generated_tonnes": 120.5}'
+    echo
+
+    log_info "Verifying ESG Metrics Endpoint..."
+    assert_api "GET" "companies/1/metrics" "200" "Metrics retrieved successfully" "Metrics retrieval failed"
+    echo
+
+    log_info "Simulating Green Loan (Tesco)..."
+    assert_cmd "Simulation successful" "Simulation failed" _api_post "companies/1/simulate-loan" '{"loan_amount": 1000000, "term_months": 120}'
+    echo
+
+    log_info "Testing CSV Bulk Export..."
+    assert_cmd "CSV Exported successfully to out/companies_export.csv" "CSV Export failed" _api_download "companies/export/csv" "companies_export.csv"
+
+    log_info "Testing PDF Quote Generation..."
+    assert_cmd "PDF Rendered successfully to out/green_loan_quote.pdf" "PDF Generation failed" _api_download "companies/1/simulate-loan/1/pdf" "green_loan_quote.pdf"
+
+    log_info "Checking container logs..."
+    _compose_logs api 5
+
+    log_success "FastAPI status check complete."
+}
+
+# --- Execution Entry ---
+main() {
+    load_env
+
+    case "${1:-}" in
+        start) start ;;
+        stop) stop ;;
+        status) diagnostics ;;
+        run) run_local ;;
+        kill) kill_ports ;;
+        config) show_env ;;
+        logs) docker logs -f "${API_CONTAINER}" ;;
+        *)
+            echo "Usage: $0 {start|stop|status|run|kill|config|logs}"
+            echo
+            echo "Commands:"
+            log_info "start   - Build and start FastAPI container"
+            log_info "stop    - Stop FastAPI container"
+            log_info "status  - Run full E2E ingestion and diagnostic workflow"
+            log_info "run     - Run locally using Uvicorn (hot-reload)"
+            log_info "kill    - Kill processes using ports 8000/8080"
+            log_info "config  - Show environment config"
+            log_info "logs    - Tail container logs"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
