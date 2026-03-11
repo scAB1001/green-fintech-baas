@@ -6,6 +6,7 @@ This module populates the PostgreSQL database with mock corporate entities and
 historical UK regional emissions/national energy datasets. It is designed
 to be idempotent, meaning it safely skips execution if data already exists.
 """
+
 import asyncio
 import json
 import sys
@@ -197,9 +198,9 @@ async def seed_national_energy(db: AsyncSession) -> None:
         df["energy_consumption"] = pd.to_numeric(
             df["energy_consumption"], errors="coerce"
         ).fillna(0.0)
-        df["co2_emission"] = pd.to_numeric(
-            df["co2_emission"], errors="coerce"
-        ).fillna(0.0)
+        df["co2_emission"] = pd.to_numeric(df["co2_emission"], errors="coerce").fillna(
+            0.0
+        )
 
         records = df.to_dict(orient="records")
         if records:
