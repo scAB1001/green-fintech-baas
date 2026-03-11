@@ -32,7 +32,7 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime - slim Python image
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
