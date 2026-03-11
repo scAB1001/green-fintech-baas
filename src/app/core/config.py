@@ -14,7 +14,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):  # type: ignore
+class Settings(BaseSettings):  # type: ignore[misc]
     """
     Global application settings instantiated from environment variables.
 
@@ -31,14 +31,14 @@ class Settings(BaseSettings):  # type: ignore
     ENVIRONMENT: str = Field("development", validation_alias="ENVIRONMENT")
 
     # DB Settings (Required from .env)
-    POSTGRES_USER: str  # type: ignore
-    POSTGRES_PASSWORD: str  # type: ignore
-    POSTGRES_DB: str  # type: ignore
-    POSTGRES_PORT: int  # type: ignore
-    POSTGRES_INITDB_ARGS: str  # type: ignore
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    POSTGRES_PORT: int
+    POSTGRES_INITDB_ARGS: str
 
     # Redis settings (Required from .env)
-    REDIS_PASSWORD: str  # type: ignore
+    REDIS_PASSWORD: str
 
     @property
     def is_development(self) -> bool:
@@ -95,4 +95,4 @@ class Settings(BaseSettings):  # type: ignore
 
 # Tell the static type checker to ignore missing arguments,
 # as Pydantic injects them dynamically from the environment.
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings()

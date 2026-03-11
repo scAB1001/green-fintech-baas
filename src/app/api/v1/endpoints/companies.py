@@ -35,11 +35,16 @@ from app.schemas.company_schema import (
     CompanySchema,
     CompanyUpdate,
 )
+from app.schemas.environmental_metric_schema import (
+    EnvironmentalMetricBase,
+    EnvironmentalMetricSchema,
+)
 from app.schemas.loan_simulation_schema import (
     LoanSimulationCreate,
     LoanSimulationResponse,
 )
 from app.services.company_service import CompanyService
+from app.services.environmental_metric_service import EnvironmentalMetricService
 from app.services.loan_simulation_service import LoanSimulationService
 from app.services.pdf_service import PDFService
 
@@ -444,3 +449,67 @@ async def get_loan_simulation_pdf(
             "Content-Disposition": f'attachment; filename="{pre}{house_id}.pdf"'
         },
     )
+
+
+@router.post(
+    "/{company_id}/metrics",
+    response_model=EnvironmentalMetricSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add Yearly ESG Metrics",
+)
+async def add_company_metrics(
+    company_id: int,
+    request: EnvironmentalMetricBase,
+    db: DbSession,
+    cache: CacheClient
+) -> EnvironmentalMetricSchema:
+    """
+    Submits actual yearly environmental performance data for a company.
+
+    This data is stored to be utilized by the loan simulation engine for
+    calculating accurate Margin Ratchets.
+    """
+    try:
+        service = EnvironmentalMetricService(db=db)
+        metric = await service.add_metric(company_id=company_id, metric_in=request)
+
+        # INVALIDATE: Clear the company's cached metric list
+        await invalidate_cache(cache, f"company:{company_id}:metrics")
+
+        return metric
+    except HTTPException as he:
+        raise he from None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from None
+
+
+@router.get(
+    "/{company_id}/metrics",
+    response_model=list[EnvironmentalMetricSchema],
+    summary="List Company ESG Metrics",
+)
+async def list_company_metrics(
+    company_id: int, db: DbSession, cache: CacheClient
+) -> dict[str, str] | list[dict[str, Any]]:
+    """
+    Retrieves the historical ESG performance data for a specific company.
+    """
+    cache_key = f"company:{company_id}:metrics"
+
+    # 1. Try Cache
+    cached_metrics = await get_cached_object(cache, cache_key)
+    if cached_metrics:
+        return cached_metrics
+
+    # 2. Database Fallback
+    service = EnvironmentalMetricService(db=db)
+    metrics = await service.get_company_metrics(company_id)
+
+    # 3. Populate Cache
+    metrics_data = [
+        EnvironmentalMetricSchema.model_validate(m).model_dump()
+        for m in metrics
+    ]
+    await set_cached_object(cache, cache_key, metrics_data)
+
+    return metrics_data
