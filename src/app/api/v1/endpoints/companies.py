@@ -47,15 +47,25 @@ from app.services.company_service import CompanyService
 from app.services.environmental_metric_service import EnvironmentalMetricService
 from app.services.loan_simulation_service import LoanSimulationService
 from app.services.pdf_service import PDFService
+from app.api.dependencies.auth import verify_api_key
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_api_key)])
 
 # Type aliases for clean dependency injection across route signatures
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CacheClient = Annotated[Redis, Depends(get_redis_client)]
 
 
-@router.post("/", response_model=CompanySchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=CompanySchema,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"description": "Company successfully registered"},
+        400: {"description": "Invalid payload or OpenCorporates ID"},
+        500: {"description": "Internal server error during external API call"},
+    },
+)
 async def create_company_endpoint(
     request: CompanyCreateRequest, db: DbSession, cache: CacheClient
 ) -> Company | None:
@@ -89,10 +99,19 @@ async def create_company_endpoint(
     except HTTPException as he:
         raise he from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from None
 
 
-@router.get("/", response_model=list[CompanySchema])
+@router.get(
+    "/",
+    response_model=list[CompanySchema],
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Paginated list of companies retrieved"},
+    },
+)
 async def list_companies(
     db: DbSession,
     cache: CacheClient,
@@ -133,7 +152,15 @@ async def list_companies(
     return companies_data
 
 
-@router.get("/{company_id}", response_model=CompanySchema)
+@router.get(
+    "/{company_id}",
+    response_model=CompanySchema,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Company retrieved successfully"},
+        404: {"description": "Company not found"},
+    },
+)
 async def get_company(
     company_id: int, db: DbSession, cache: CacheClient
 ) -> dict[str, Any]:
@@ -177,7 +204,16 @@ async def get_company(
     return company_data
 
 
-@router.patch("/{company_id}", response_model=CompanySchema)
+@router.patch(
+    "/{company_id}",
+    response_model=CompanySchema,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Company updated successfully"},
+        400: {"description": "Invalid update parameters provided"},
+        404: {"description": "Company not found"},
+    },
+)
 async def update_company(
     company_id: int, company_in: CompanyUpdate, db: DbSession, cache: CacheClient
 ) -> Company:
@@ -224,7 +260,14 @@ async def update_company(
     return company
 
 
-@router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{company_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Company successfully deleted"},
+        404: {"description": "Company not found"},
+    },
+)
 async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> None:
     """
     Hard-deletes a company and cascades deletions to related records.
@@ -246,13 +289,26 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
             status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
 
+    # 1. Capture the IDs of all simulations tied to this company BEFORE deletion
+    sim_query = select(LoanSimulation.id).where(
+        LoanSimulation.company_id == company_id)
+    sim_result = await db.execute(sim_query)
+    simulation_ids = sim_result.scalars().all()
+
+    # 2. Execute the database delete (cascades automatically in Postgres)
     await db.delete(company)
     await db.commit()
 
-    # INVALIDATE: Clear entity, paginated lists, and CSV dumps
+    # 3. Aggressive Cache Invalidation
     await invalidate_cache(cache, f"company:{company_id}")
+    # Clear metrics cache
+    await invalidate_cache(cache, f"company:{company_id}:metrics")
     await invalidate_pattern(cache, "companies:list:*")
     await invalidate_cache(cache, "companies:csv")
+
+    # 4. Loop through and destroy all Zombie PDFs
+    for sim_id in simulation_ids:
+        await invalidate_cache(cache, f"simulation:{sim_id}:pdf")
 
 
 @router.post(
@@ -260,8 +316,11 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
     response_model=LoanSimulationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate a Green Loan Simulation",
-    description="Cross-references company data with regional emissions and \
-        national energy datasets to calculate an ESG-adjusted interest rate.",
+    responses={
+        201: {"description": "Simulation successfully generated"},
+        404: {"description": "Company not found"},
+        500: {"description": "Math engine failure"},
+    },
 )
 async def simulate_green_loan(
     company_id: int, request: LoanSimulationCreate, db: DbSession
@@ -304,6 +363,7 @@ async def simulate_green_loan(
     summary="Export Companies to CSV",
     response_class=Response,
     response_model=None,
+    status_code=status.HTTP_200_OK,
     responses={
         200: {
             "content": {"text/csv": {}},
@@ -369,16 +429,18 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     summary="Download Loan Simulation PDF",
     response_class=Response,
     response_model=None,
+    status_code=status.HTTP_200_OK,
     responses={
         200: {
             "content": {"application/pdf": {}},
             "description": "The rendered PDF document.",
-        }
+        },
+        404: {"description": "Company or Simulation not found"},
     },
 )
 async def get_loan_simulation_pdf(
     company_id: int, simulation_id: int, db: DbSession, cache: CacheClient
-) -> None | Response:
+) -> Response:
     """
     Generates a dynamic PDF formal quote for a loan simulation.
 
@@ -420,14 +482,16 @@ async def get_loan_simulation_pdf(
     company_result = await db.execute(company_query)
     company = company_result.scalars().first()
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
     sim_query = select(LoanSimulation).where(LoanSimulation.id == simulation_id)
     sim_result = await db.execute(sim_query)
     simulation = sim_result.scalars().first()
 
     if not simulation or simulation.company_id != company_id:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Simulation not found")
 
     # Generate the binary PDF payload
     pdf_bytes = PDFService.generate_loan_quote_pdf(company, simulation)
@@ -451,6 +515,12 @@ async def get_loan_simulation_pdf(
     response_model=EnvironmentalMetricSchema,
     status_code=status.HTTP_201_CREATED,
     summary="Add Yearly ESG Metrics",
+    responses={
+        201: {"description": "Metrics successfully submitted"},
+        400: {"description": "Invalid metric payload"},
+        404: {"description": "Company not found"},
+        409: {"description": "Metrics for this reporting year already exist"},
+    },
 )
 async def add_company_metrics(
     company_id: int, request: EnvironmentalMetricBase, db: DbSession, cache: CacheClient
@@ -472,13 +542,20 @@ async def add_company_metrics(
     except HTTPException as he:
         raise he from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from None
 
 
 @router.get(
     "/{company_id}/metrics",
     response_model=list[EnvironmentalMetricSchema],
+    status_code=status.HTTP_200_OK,
     summary="List Company ESG Metrics",
+    responses={
+        200: {"description": "Company metrics retrieved"},
+        404: {"description": "Company not found"},
+    },
 )
 async def list_company_metrics(
     company_id: int, db: DbSession, cache: CacheClient
@@ -486,6 +563,16 @@ async def list_company_metrics(
     """
     Retrieves the historical ESG performance data for a specific company.
     """
+    # Parent Entity Validation: Enforce REST strictness. If the company
+    # doesn't exist, we must return a 404, not an empty metrics list.
+    company_exists = await db.scalar(
+        select(Company.id).where(Company.id == company_id)
+    )
+    if not company_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+        )
+
     cache_key = f"company:{company_id}:metrics"
 
     # 1. Try Cache

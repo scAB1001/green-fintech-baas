@@ -176,8 +176,8 @@ async def test_delete_company_success_and_cache_invalidate(
         response = await async_client.delete(f"/api/v1/companies/{target.id}")
         assert response.status_code == 204
 
-        # Validates both the specific company cache and the CSV cache were purged
-        assert mock_inv.call_count == 2
+        # Validates the specific company cache, the loan cache and CSV cache were purged
+        assert mock_inv.call_count == 3
         mock_inv.assert_any_call(ANY, f"company:{target.id}")
         mock_inv.assert_any_call(ANY, "companies:csv")
 

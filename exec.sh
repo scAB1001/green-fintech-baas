@@ -43,22 +43,22 @@ show_menu() {
     echo -e "\n${BOLD}🐘 Postgres Database (Local/Docker)${NC}"
     echo -e "  05) $(opt "db-up")       Start PG Container       06) $(opt "db-seed")     Seed PG Database"
     echo -e "  07) $(opt "db-stat")     Health & Stats           08) $(opt "db-wipe")     Nuke PG Volume & Reset"
-    echo -e "  08b) $(opt "db-dump")    Dump Table Data"
 
     echo -e "\n${BOLD}🚀 Redis Cache Service${NC}"
     echo -e "  09) $(opt "rd-up")       Start Redis Container    10) $(opt "rd-stat")     Ping & Key Check"
+    echo -e "  11) $(opt "rd-demo")     Interactive Demo         12) $(opt "rd-flush")    Flush Cache"
 
     echo -e "\n${BOLD}⚗️  Alembic Migrations${NC}"
-    echo -e "  11) $(opt "mig-new")     Create Autogen Rev       12) $(opt "mig-up")      Preview & Apply"
-    echo -e "  13) $(opt "mig-stat")    History & Rollback"
+    echo -e "  13) $(opt "mig-new")     Create Autogen Rev       14) $(opt "mig-up")      Preview & Apply"
+    echo -e "  15) $(opt "mig-stat")    History & Rollback"
 
     echo -e "\n${BOLD}🌐 FastAPI Service${NC}"
-    echo -e "  14) $(opt "api-up")      Start FastAPI Container  15) $(opt "api-stat")    Health/Docs/Endpoint"
-    echo -e "  16) $(opt "run")         Local Uvicorn Server"
+    echo -e "  16) $(opt "api-up")      Start FastAPI Container  17) $(opt "api-stat")    Health/Docs/Endpoint"
+    echo -e "  18) $(opt "run")         Local Uvicorn Server     19) $(opt "api-demo")    Interactive CRUD Demo"
 
     echo -e "\n${BOLD}🧪 Testing, Building and Publishing${NC}"
-    echo -e "  17) $(opt "test")        Pytest (Standard)        18) $(opt "e2e")         E2E (End-to-End) Test"
-    echo -e "  19) $(opt "stack")       Full Docker Stack        20) $(opt "down")        Stop Environment"
+    echo -e "  20) $(opt "test")        Pytest (Standard)        21) $(opt "e2e")         E2E (End-to-End) Test"
+    echo -e "  22) $(opt "stack")       Full Docker Stack        23) $(opt "down")        Stop Environment"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
 
@@ -71,27 +71,29 @@ show_menu() {
         3|clean)     run_script "clean" ;;
         4|kill)      run_script "kill-ports" ;;
 
-        5|db-up)     header "POSTGRES"; _pg_exec "start" ;;
-        6|db-seed)   header "SEEDING";  _pg_exec "seed" ;;
-        7|db-stat)   header "DB STATS"; _pg_exec "inspect" ;;
-        8|db-wipe)   header "DB WIPE";  _pg_exec "wipe" ;;
-        8b|db-dump)  header "DB DUMP";  _pg_exec "dump" ;;
+        5|db-up)     header "POSTGRES";     _pg_exec "start" ;;
+        6|db-seed)   header "SEEDING";      _pg_exec "seed" ;;
+        7|db-stat)   header "DB STATS";     _pg_exec "inspect" ;;
+        8|db-wipe)   header "DB WIPE";      _pg_exec "wipe" ;;
 
-        9|rd-up)     header "REDIS";    _rd_exec "start" ;;
-        10|rd-stat)  header "REDIS STAT"; _rd_exec "status" ;;
+        9|rd-up)     header "REDIS";        _rd_exec "start" ;;
+        10|rd-stat)  header "REDIS STAT";   _rd_exec "status" ;;
+        11|rd-demo)  header "DEMO";         _rd_exec "demo" ;;
+        12|rd-flush) header "FLUSH CACHE";  _rd_exec "flush" ;;
 
-        11|mig-new)  _pg_exec "mig-new" ;;
-        12|mig-up)   _pg_exec "mig-up" ;;
-        13|mig-stat) _pg_exec "mig-stat" ;;
+        13|mig-new)  _pg_exec "mig-new" ;;
+        14|mig-up)   _pg_exec "mig-up" ;;
+        15|mig-stat) _pg_exec "mig-stat" ;;
 
-        14|api-up)   header "FASTAPI";  _api_exec "start" ;;
-        15|api-stat) header "API E2E";  _api_exec "status" ;;
-        16|run)      header "UVICORN";  _api_exec "run" ;;
+        16|api-up)   header "FASTAPI";      _api_exec "start" ;;
+        17|api-stat) header "API E2E";      _api_exec "status" ;;
+        18|run)      header "UVICORN";      _api_exec "run" ;;
+        19|api-demo) header "DEMO";         _api_exec "demo" ;;
 
-        17|test)     run_script "test" ;;
-        18|e2e)      run_script "e2e" ;;
-        19|stack)    run_script "docker-stack" ;;
-        20|stack)    run_script "docker-down" ;;
+        20|test)     run_script "test" ;;
+        21|e2e)      run_script "e2e" ;;
+        22|stack)    run_script "docker-stack" ;;
+        23|down|stack)    run_script "docker-down" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
         *)  log_error "Invalid option"; sleep 1; show_menu ;;
     esac

@@ -197,7 +197,7 @@ jobs:
     # THIS REPLACES THE MANUAL GIT PUSH LOGIC
     - name: Create Pull Request for Release
       if: steps.calculate-version.outputs.should_release == 'true'
-      uses: peter-evans/create-pull-request@v6
+      uses: peter-evans/create-pull-request@v8
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         commit-message: "chore: release ${{ steps.calculate-version.outputs.new_version }}"

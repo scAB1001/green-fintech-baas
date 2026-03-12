@@ -30,12 +30,17 @@ _redis_ping() {
 }
 
 _api_post() {
-    curl -s -o /dev/null -w "%{http_code}" -X 'POST' "${ROOT_URL}$1" \
-        -H 'Content-Type: application/json' -H 'accept: application/json' -d "$2"
+    curl -s -o /dev/null -w "%{http_code}" \
+        -X 'POST' "${ROOT_URL}$1" \
+        -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json' -d "$2"
 }
 
 _api_delete() {
-    curl -s -o /dev/null -w "%{http_code}" -X 'DELETE' "${ROOT_URL}$1" \
+    curl -s -o /dev/null -w "%{http_code}" \
+        -X 'DELETE' "${ROOT_URL}$1" \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json'
 }
 
@@ -140,6 +145,8 @@ status() {
             _redis KEYS "*" | sed 's/^/  > /'
         fi
     fi
+
+    memory
 }
 
 logs() {
@@ -147,9 +154,12 @@ logs() {
 }
 
 # --- End-to-End Diagnostics ---
-diagnostics() {
-    header "CACHING & INVALIDATION DIAGNOSTICS"
+demo() {
+    if ask_yes_no "Run latency test?"; then
+        latency
+    fi
 
+    header "CACHING & INVALIDATION DIAGNOSTICS"
     if ! curl -s "${ROOT_URL}/health" >/dev/null; then
         log_error "API is not running at ${ROOT_URL}. Start it first."
         exit 1
@@ -177,6 +187,7 @@ diagnostics() {
     log_info "6. Ingesting Barclays (01026167) to trigger POST invalidation..."
     assert_cmd "Ingestion complete." "Ingestion failed" _api_post "/api/v1/companies/" '{"company_number": "01026167"}'
 
+    echo
     log_info "7. Checking Redis Keys (The 'companies:csv' key should be purged):"
     _redis KEYS "*" | sed 's/^/  > /'
 
@@ -189,12 +200,13 @@ diagnostics() {
     log_info "8c. Adding 2025 metrics to trigger POST invalidation..."
     _api_post "/api/v1/companies/1/metrics" '{"reporting_year": 2025, "energy_consumption_mwh": 4000.0, "carbon_emissions_tco2e": 200.0}'
 
+    echo
     log_info "9. Triggering DELETE invalidation (Removing Company ID 2)..."
     assert_cmd "Deletion complete." "Deletion failed" _api_delete "/api/v1/companies/2"
 
+    echo
     log_info "10. Final Redis Keys (The 'companies:csv' key should be purged again):"
     _redis KEYS "*" | sed 's/^/  > /'
-
     log_success "Cache behavior diagnostics complete."
 }
 
@@ -213,9 +225,9 @@ main() {
         latency) latency ;;
         memory) memory ;;
         logs) logs ;;
-        diagnostics) diagnostics ;;
+        demo) demo ;;
         *)
-            echo "Usage: $0 {start|stop|status|reset|flush|cli|monitor|latency|memory|logs|diagnostics}"
+            echo "Usage: $0 {start|stop|status|reset|flush|cli|monitor|latency|memory|logs|demo}"
             echo
             echo "Commands:"
             log_info "start        - Start Redis container"
@@ -228,7 +240,7 @@ main() {
             log_info "latency      - Run continuous latency sampling"
             log_info "memory       - Profile memory usage and fragmentation"
             log_info "logs         - Tail container logs"
-            log_info "diagnostics  - Run E2E cache invalidation and timing tests"
+            log_info "demo  - Run E2E cache invalidation and timing tests"
             echo
             exit 1
             ;;
