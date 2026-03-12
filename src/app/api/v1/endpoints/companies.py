@@ -89,7 +89,9 @@ async def create_company_endpoint(
     except HTTPException as he:
         raise he from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from None
 
 
 @router.get("/", response_model=list[CompanySchema])
@@ -420,14 +422,16 @@ async def get_loan_simulation_pdf(
     company_result = await db.execute(company_query)
     company = company_result.scalars().first()
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
     sim_query = select(LoanSimulation).where(LoanSimulation.id == simulation_id)
     sim_result = await db.execute(sim_query)
     simulation = sim_result.scalars().first()
 
     if not simulation or simulation.company_id != company_id:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Simulation not found")
 
     # Generate the binary PDF payload
     pdf_bytes = PDFService.generate_loan_quote_pdf(company, simulation)
@@ -472,13 +476,20 @@ async def add_company_metrics(
     except HTTPException as he:
         raise he from None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from None
 
 
 @router.get(
     "/{company_id}/metrics",
     response_model=list[EnvironmentalMetricSchema],
+    status_code=status.HTTP_200_OK,
     summary="List Company ESG Metrics",
+    responses={
+        200: {"description": "Company metrics retrieved"},
+        404: {"description": "Company not found"},
+    },
 )
 async def list_company_metrics(
     company_id: int, db: DbSession, cache: CacheClient
@@ -486,6 +497,16 @@ async def list_company_metrics(
     """
     Retrieves the historical ESG performance data for a specific company.
     """
+    # Parent Entity Validation: Enforce REST strictness. If the company
+    # doesn't exist, we must return a 404, not an empty metrics list.
+    company_exists = await db.scalar(
+        select(Company.id).where(Company.id == company_id)
+    )
+    if not company_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+        )
+
     cache_key = f"company:{company_id}:metrics"
 
     # 1. Try Cache

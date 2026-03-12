@@ -8,6 +8,7 @@
 An elite, asynchronous REST API designed to bridge the gap between corporate financial data and environmental sustainability.
 
 **The Problem:** Traditional lenders lack the specialized data models to accurately assess the financial risk of sustainability-focused projects, creating a "green financing gap."
+
 **The Solution:** This platform acts as a BaaS backend, actively ingesting live corporate registry data from OpenCorporates, cross-referencing it against UK national energy and regional emissions datasets to gain ESG analytics, and dynamically generating Sustainability-Linked Loan (SLL) quotes.
 
 ## 📚 Academic Deliverables & Documentation
