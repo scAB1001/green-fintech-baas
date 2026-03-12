@@ -73,6 +73,47 @@ _api_download() {
     fi
 }
 
+# --- API Demo Visual Wrappers ---
+_demo_get() {
+    # Added -L to follow redirects
+    local response
+    response=$(curl -sL -X 'GET' "${HOST_URL}$1" -H 'accept: application/json')
+    if [ -n "$response" ]; then
+        echo "$response" | python3 -m json.tool
+    else
+        echo -e "${RED}Error: Received empty response from server.${NC}"
+    fi
+}
+
+_demo_post() {
+    # Added -L to follow redirects
+    local response
+    response=$(curl -sL -X 'POST' "${HOST_URL}$1" \
+        -H 'Content-Type: application/json' \
+        -H 'accept: application/json' \
+        -d "$2")
+    if [ -n "$response" ]; then
+        echo "$response" | python3 -m json.tool
+    else
+        echo -e "${RED}Error: Received empty response from server.${NC}"
+    fi
+}
+
+_demo_patch() {
+    # Added -L to follow redirects
+    local response
+    response=$(curl -sL -X 'PATCH' "${HOST_URL}$1" \
+        -H 'Content-Type: application/json' \
+        -H 'accept: application/json' \
+        -d "$2")
+    if [ -n "$response" ]; then
+        echo "$response" | python3 -m json.tool
+    else
+        echo -e "${RED}Error: Received empty response from server.${NC}"
+    fi
+}
+
+
 # Usage: assert_api "GET" "/endpoint" "200" "Success msg" "Error msg"
 assert_api() {
     local method="$1"
@@ -206,6 +247,141 @@ diagnostics() {
     log_success "FastAPI status check complete."
 }
 
+prompt_next() {
+    log_warn "\nPress enter to go to the next step..."; read -r
+}
+
+# --- Interactive System Demonstration ---
+api_demo() {
+    header "FULL SYSTEM DIAGNOSTIC & API DEMONSTRATION"
+
+    log_info "Step 0: SYSTEM HEALTH & DOCS"
+    assert_root_api "GET" "/health" "200" "Health OK" "Health check failed"
+    assert_root_api "GET" "/docs" "200" "OpenAPI Docs OK" "Docs unreachable"
+    assert_root_api "GET" "/redoc" "200" "ReDoc OK" "Redocs unreachable"
+    prompt_next
+
+    log_info "Step 1: CREATE (C) - Ingesting Corporate Entities"
+    log_data "POST /companies/ (TESCO PLC)"
+
+    # Capture the raw JSON response
+    local tesco_res
+    tesco_res=$(curl -sL -X 'POST' "${HOST_URL}companies" \
+        -H 'Content-Type: application/json' \
+        -H 'accept: application/json' \
+        -d '{"company_number": "00445790"}')
+
+    # Display it beautifully
+    echo "$tesco_res" | python3 -m json.tool
+
+    # Dynamically extract the newly assigned ID using Python
+    COMPANY_ID=$(echo "$tesco_res" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
+
+    if [ -z "$COMPANY_ID" ] || [ "$COMPANY_ID" == "None" ]; then
+        log_error "Failed to parse Company ID from response. Aborting."
+        return 1
+    fi
+    log_success "Dynamically captured TESCO Company ID: $COMPANY_ID"
+
+    echo
+    log_data "POST /companies/ (SHELL PLC)"
+    _demo_post "companies" '{"company_number": "04366849"}'
+    prompt_next
+
+    log_info "Step 2: READ (R) - Fetching Directory and Specific Entity"
+    log_data "GET /companies/ (List all companies)"
+    _demo_get "companies"
+
+    echo
+    log_data "GET /companies/$COMPANY_ID (Fetch TESCO specifically)"
+    _demo_get "companies/$COMPANY_ID"
+    prompt_next
+
+    log_info "Step 3: UPDATE (U) - Patching Company Details (Updating Sector)"
+    log_data "PATCH /companies/$COMPANY_ID"
+    _demo_patch "companies/$COMPANY_ID" '{"business_sector": "Advanced Retail Logistics"}'
+    prompt_next
+
+    log_info "Step 4: ESG METRICS - Submitting and Verifying"
+    log_data "POST /companies/$COMPANY_ID/metrics"
+    _demo_post "companies/$COMPANY_ID/metrics" '{"reporting_year": 2024, "energy_consumption_mwh": 4500.5, "carbon_emissions_tco2e": 250.0, "water_usage_m3": 500.0, "waste_generated_tonnes": 120.5}'
+
+    echo
+    log_data "GET /companies/$COMPANY_ID/metrics (Verify insertion)"
+    _demo_get "companies/$COMPANY_ID/metrics"
+    prompt_next
+
+    log_info "Step 5: ENGINE EXECUTION - Simulating Green Loan (SLL)"
+    log_warn "This step triggers the algorithmic Margin Ratchet calculation."
+    log_data "POST /companies/$COMPANY_ID/simulate-loan"
+
+    # Capture the simulation response to extract the Simulation ID
+    local sim_res
+    sim_res=$(curl -sL -X 'POST' "${HOST_URL}companies/$COMPANY_ID/simulate-loan" \
+        -H 'Content-Type: application/json' \
+        -H 'accept: application/json' \
+        -d '{"loan_amount": 2500000, "term_months": 60}')
+
+    echo "$sim_res" | python3 -m json.tool
+    SIM_ID=$(echo "$sim_res" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
+
+    log_success "Dynamically captured Simulation ID: $SIM_ID"
+    prompt_next
+
+    log_info "Step 6: BULK EXPORTS & FILES - CSV and PDF Generation"
+    log_data "GET /companies/export/csv"
+    assert_cmd "CSV Exported successfully to out/companies_export.csv" "CSV Export failed" _api_download "companies/export/csv" "companies_export.csv"
+
+    echo
+    log_data "GET /companies/$COMPANY_ID/simulate-loan/$SIM_ID/pdf"
+    assert_cmd "PDF Rendered successfully to out/green_loan_quote.pdf" "PDF Generation failed" _api_download "companies/$COMPANY_ID/simulate-loan/$SIM_ID/pdf" "green_loan_quote.pdf"
+    prompt_next
+
+    log_info "Step 7: DELETE (D) - Hard-deleting the Company"
+    log_warn "This will cascade and destroy the company, its metrics, and the loan simulation."
+    log_data "DELETE /companies/$COMPANY_ID"
+    local status=$(_api_status "DELETE" "companies/$COMPANY_ID")
+    if [ "$status" = "204" ]; then
+        log_success "Company Deleted (HTTP 204)"
+    else
+        log_error "Deletion Failed"
+    fi
+    prompt_next
+
+    log_info "Step 8: VERIFICATION - Ensuring Referential Integrity (Cascading Deletes)"
+    log_data "GET /companies/$COMPANY_ID (Checking Parent Company)"
+    local verify_status=$(_api_status "GET" "companies/$COMPANY_ID")
+    if [ "$verify_status" = "404" ]; then
+        log_success "Verified: Parent Company is gone (HTTP 404)"
+    else
+        log_error "Company still exists!"
+    fi
+
+    log_data "GET /companies/$COMPANY_ID/metrics (Checking Cascaded Metrics)"
+    local metric_status=$(_api_status "GET" "companies/$COMPANY_ID/metrics")
+    if [ "$metric_status" = "404" ]; then
+        log_success "Verified: Cascaded Metrics are gone (HTTP 404)"
+    else
+        log_error "Metrics still exist!"
+    fi
+
+    log_data "GET /companies/$COMPANY_ID/simulate-loan/$SIM_ID/pdf (Checking PDF Access)"
+    local pdf_status=$(_api_status "GET" "companies/$COMPANY_ID/simulate-loan/$SIM_ID/pdf")
+    if [ "$pdf_status" = "404" ]; then
+        log_success "Verified: Simulation access blocked/deleted (HTTP 404)"
+    else
+        log_error "Simulation still accessible!"
+    fi
+    prompt_next
+
+    log_info "Step 9: SYSTEM LOGS"
+    log_info "Checking recent container logs for any silent errors..."
+    _compose_logs api 5
+
+    echo
+    log_success "Full System Diagnostic, CRUD, and Execution Demonstration Complete!"
+}
+
 # --- Execution Entry ---
 main() {
     load_env
@@ -214,6 +390,7 @@ main() {
         start) start ;;
         stop) stop ;;
         status) diagnostics ;;
+        demo) api_demo ;;
         run) run_local ;;
         kill) kill_ports ;;
         config) show_env ;;

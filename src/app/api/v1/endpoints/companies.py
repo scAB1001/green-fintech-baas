@@ -288,13 +288,26 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
             status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
 
+    # 1. Capture the IDs of all simulations tied to this company BEFORE deletion
+    sim_query = select(LoanSimulation.id).where(
+        LoanSimulation.company_id == company_id)
+    sim_result = await db.execute(sim_query)
+    simulation_ids = sim_result.scalars().all()
+
+    # 2. Execute the database delete (cascades automatically in Postgres)
     await db.delete(company)
     await db.commit()
 
-    # INVALIDATE: Clear entity, paginated lists, and CSV dumps
+    # 3. Aggressive Cache Invalidation
     await invalidate_cache(cache, f"company:{company_id}")
+    # Clear metrics cache
+    await invalidate_cache(cache, f"company:{company_id}:metrics")
     await invalidate_pattern(cache, "companies:list:*")
     await invalidate_cache(cache, "companies:csv")
+
+    # 4. Loop through and destroy all Zombie PDFs
+    for sim_id in simulation_ids:
+        await invalidate_cache(cache, f"simulation:{sim_id}:pdf")
 
 
 @router.post(

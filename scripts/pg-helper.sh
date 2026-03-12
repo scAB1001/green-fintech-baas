@@ -149,6 +149,8 @@ seed() {
 
     log_info "Seeding data..."
     assert_cmd "Seeds planted" "Database seeding failed" uv run python -m scripts.seed_db
+
+    dump
     log_success "Postgres db fully initialised."
 }
 
