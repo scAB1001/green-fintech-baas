@@ -80,6 +80,7 @@ wipe() {
     log_serious "WARNING: This will delete ALL data!"
     if ask_yes_no "Are you sure?"; then
         _compose_down "postgres"
+        mig_wipe
         start
         log_success "Database wipe complete"
     fi
@@ -112,6 +113,12 @@ mig_up() {
     fi
 }
 
+mig_wipe() {
+    if ask_yes_no "Would you like to purge Alembic history?"; then
+        assert_cmd "Migrations wiped." "Migrations failed to wipe." rm -rf alembic/versions/*.py
+    fi
+}
+
 mig_stat() {
     header "MIGRATION STATUS"
     log_info "Checking migration history..."
@@ -132,6 +139,8 @@ seed() {
     header "POSTGRES DB INITIALISATION"
     log_info "Starting PostgreSQL Database..."
     assert_cmd "PostgreSQL is active." "Database failed to start" start
+
+    mig_wipe
 
     mig_new
 

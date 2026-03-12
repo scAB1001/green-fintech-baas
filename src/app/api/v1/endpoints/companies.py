@@ -55,7 +55,16 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 CacheClient = Annotated[Redis, Depends(get_redis_client)]
 
 
-@router.post("/", response_model=CompanySchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=CompanySchema,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"description": "Company successfully registered"},
+        400: {"description": "Invalid payload or OpenCorporates ID"},
+        500: {"description": "Internal server error during external API call"},
+    },
+)
 async def create_company_endpoint(
     request: CompanyCreateRequest, db: DbSession, cache: CacheClient
 ) -> Company | None:
@@ -94,7 +103,14 @@ async def create_company_endpoint(
         ) from None
 
 
-@router.get("/", response_model=list[CompanySchema])
+@router.get(
+    "/",
+    response_model=list[CompanySchema],
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Paginated list of companies retrieved"},
+    },
+)
 async def list_companies(
     db: DbSession,
     cache: CacheClient,
@@ -135,7 +151,15 @@ async def list_companies(
     return companies_data
 
 
-@router.get("/{company_id}", response_model=CompanySchema)
+@router.get(
+    "/{company_id}",
+    response_model=CompanySchema,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Company retrieved successfully"},
+        404: {"description": "Company not found"},
+    },
+)
 async def get_company(
     company_id: int, db: DbSession, cache: CacheClient
 ) -> dict[str, Any]:
@@ -179,7 +203,16 @@ async def get_company(
     return company_data
 
 
-@router.patch("/{company_id}", response_model=CompanySchema)
+@router.patch(
+    "/{company_id}",
+    response_model=CompanySchema,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Company updated successfully"},
+        400: {"description": "Invalid update parameters provided"},
+        404: {"description": "Company not found"},
+    },
+)
 async def update_company(
     company_id: int, company_in: CompanyUpdate, db: DbSession, cache: CacheClient
 ) -> Company:
@@ -226,7 +259,14 @@ async def update_company(
     return company
 
 
-@router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{company_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Company successfully deleted"},
+        404: {"description": "Company not found"},
+    },
+)
 async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> None:
     """
     Hard-deletes a company and cascades deletions to related records.
@@ -262,8 +302,11 @@ async def delete_company(company_id: int, db: DbSession, cache: CacheClient) -> 
     response_model=LoanSimulationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate a Green Loan Simulation",
-    description="Cross-references company data with regional emissions and \
-        national energy datasets to calculate an ESG-adjusted interest rate.",
+    responses={
+        201: {"description": "Simulation successfully generated"},
+        404: {"description": "Company not found"},
+        500: {"description": "Math engine failure"},
+    },
 )
 async def simulate_green_loan(
     company_id: int, request: LoanSimulationCreate, db: DbSession
@@ -306,6 +349,7 @@ async def simulate_green_loan(
     summary="Export Companies to CSV",
     response_class=Response,
     response_model=None,
+    status_code=status.HTTP_200_OK,
     responses={
         200: {
             "content": {"text/csv": {}},
@@ -371,16 +415,18 @@ async def export_companies_csv(db: DbSession, cache: CacheClient) -> Response:
     summary="Download Loan Simulation PDF",
     response_class=Response,
     response_model=None,
+    status_code=status.HTTP_200_OK,
     responses={
         200: {
             "content": {"application/pdf": {}},
             "description": "The rendered PDF document.",
-        }
+        },
+        404: {"description": "Company or Simulation not found"},
     },
 )
 async def get_loan_simulation_pdf(
     company_id: int, simulation_id: int, db: DbSession, cache: CacheClient
-) -> None | Response:
+) -> Response:
     """
     Generates a dynamic PDF formal quote for a loan simulation.
 
@@ -455,6 +501,12 @@ async def get_loan_simulation_pdf(
     response_model=EnvironmentalMetricSchema,
     status_code=status.HTTP_201_CREATED,
     summary="Add Yearly ESG Metrics",
+    responses={
+        201: {"description": "Metrics successfully submitted"},
+        400: {"description": "Invalid metric payload"},
+        404: {"description": "Company not found"},
+        409: {"description": "Metrics for this reporting year already exist"},
+    },
 )
 async def add_company_metrics(
     company_id: int, request: EnvironmentalMetricBase, db: DbSession, cache: CacheClient

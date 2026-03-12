@@ -15,7 +15,7 @@ isolated app instances for integration testing.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.endpoints import companies
@@ -68,6 +68,10 @@ def create_application() -> FastAPI:
             "version": settings.VERSION,
             "environment": settings.ENVIRONMENT,
         }
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon() -> Response:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @app.get("/health", tags=["Monitoring"])
     async def health_check() -> dict[str, str]:

@@ -8,26 +8,27 @@ allowing it to auto-generate and apply DDL (Data Definition Language) changes.
 """
 
 import sys
-from logging.config import fileConfig
 from pathlib import Path
-
-from sqlalchemy import engine_from_config, pool
-
-from alembic import context
 
 # We must insert the 'src' directory into the system path before Alembic
 # attempts to import our application models. This bridges the gap between
 # the Alembic CLI execution context and our project's Domain-Driven structure.
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from app.core.config import settings
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config, pool
+from alembic import context
+
 from app.database.session import Base
+from app.core.config import settings
 
 # Alembic needs to load the model definitions into memory so it can compare
 # the ORM state against the actual database schema. (These are usually
-# imported in a central models/__init__.py or listed here).
-# from app.models import Company, EnvironmentalMetric, LoanSimulation, \
-#     NationalEnergy, RegionalEmission
+from app.models.company import Company  # noqa: F401
+from app.models.environmental_metric import EnvironmentalMetric  # noqa: F401
+from app.models.loan_simulation import LoanSimulation  # noqa: F401
+from app.models.national_energy import NationalEnergy  # noqa: F401
+from app.models.regional_emission import RegionalEmission  # noqa: F401
 
 # Access the Alembic Config object, which provides access to the values
 # within the alembic.ini file in use.
