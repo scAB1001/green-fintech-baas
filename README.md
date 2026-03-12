@@ -143,6 +143,7 @@ Ensure your `.env` contains at least the following baseline configurations (inse
 
 ```ini
 # .env
+API_KEY=sk_test_greenfintech_123456
 ENVIRONMENT=development  # or production
 PROJECT_NAME="Green FinTech BaaS Simulator"
 VERSION="1.3.0"
