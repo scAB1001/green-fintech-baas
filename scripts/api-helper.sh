@@ -24,7 +24,9 @@ show_env() {
 # Usage: _api_get "/endpoint" | "endpoint"
 _api_get() {
     local endpoint="${1#/}"
-    curl -s -X 'GET' "${HOST_URL}${endpoint}" -H 'accept: application/json'
+    curl -s -X 'GET' "${HOST_URL}${endpoint}" \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json'
 }
 
 # Usage: _api_post "/endpoint" | "endpoint" '{"json": "data"}'
@@ -32,6 +34,7 @@ _api_post() {
     local endpoint="${1#/}"
     curl -s -o /dev/null -X 'POST' "${HOST_URL}${endpoint}" \
         -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json' \
         -d "$2"
 }
@@ -39,21 +42,29 @@ _api_post() {
 # Usage: _api_delete "/endpoint" | "endpoint"
 _api_delete() {
     local endpoint="${1#/}"
-    curl -s -o /dev/null -X 'DELETE' "${HOST_URL}${endpoint}" -H 'accept: application/json'
+    curl -s -o /dev/null -X 'DELETE' "${HOST_URL}${endpoint}" \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json'
 }
 
 # Usage: _api_status "GET" "/endpoint" | "endpoint"
 _api_status() {
     local method="$1"
     local endpoint="${2#/}"
-    curl -s -o /dev/null -w "%{http_code}" -X "$method" "${HOST_URL}${endpoint}" -H 'accept: application/json'
+    curl -s -o /dev/null -w "%{http_code}" \
+        -X "$method" "${HOST_URL}${endpoint}" \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json'
 }
 
 # Special wrapper for root endpoints like /health, /docs
 _root_status() {
     local method="$1"
     local endpoint="${2#/}"
-    curl -s -o /dev/null -w "%{http_code}" -X "$method" "${ROOT_URL}/${endpoint}" -H 'accept: application/json'
+    curl -s -o /dev/null -w "%{http_code}" \
+        -X "$method" "${ROOT_URL}/${endpoint}" \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json'
 }
 
 # Usage: _api_download "/endpoint" | "endpoint" "filename.ext"
@@ -62,7 +73,10 @@ _api_download() {
     local curl_exit
     local endpoint="${1#/}"
 
-    status=$(curl -s -w "%{http_code}" -X 'GET' "${HOST_URL}${endpoint}" -o "$OUT_DIR/$2")
+    status=$(curl -s -w "%{http_code}" \
+        -X 'GET' "${HOST_URL}${endpoint}" \
+        -H "X-API-Key: ${API_KEY}" \
+        -o "$OUT_DIR/$2")
     curl_exit=$?
 
     if [[ "$status" == "200" && "$curl_exit" -eq 0 ]]; then
@@ -77,7 +91,32 @@ _api_download() {
 _demo_get() {
     # Added -L to follow redirects
     local response
-    response=$(curl -sL -X 'GET' "${HOST_URL}$1" -H 'accept: application/json')
+    response=$(curl -sL -X 'GET' "${HOST_URL}$1" \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json')
+    if [ -n "$response" ]; then
+        echo "$response" | python3 -m json.tool
+    else
+        echo -e "${RED}Error: Received empty response from server.${NC}"
+    fi
+}
+
+_demo_get_no_auth() {
+    local response
+    response=$(curl -sL -X 'GET' "${HOST_URL}$1" \
+        -H 'accept: application/json')
+    if [ -n "$response" ]; then
+        echo "$response" | python3 -m json.tool
+    else
+        echo -e "${RED}Error: Received empty response from server.${NC}"
+    fi
+}
+
+_demo_get_bad_auth() {
+    local response
+    response=$(curl -sL -X 'GET' "${HOST_URL}$1" \
+        -H "X-API-Key: badKey123" \
+        -H 'accept: application/json')
     if [ -n "$response" ]; then
         echo "$response" | python3 -m json.tool
     else
@@ -86,10 +125,10 @@ _demo_get() {
 }
 
 _demo_post() {
-    # Added -L to follow redirects
     local response
     response=$(curl -sL -X 'POST' "${HOST_URL}$1" \
         -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json' \
         -d "$2")
     if [ -n "$response" ]; then
@@ -100,10 +139,10 @@ _demo_post() {
 }
 
 _demo_patch() {
-    # Added -L to follow redirects
     local response
     response=$(curl -sL -X 'PATCH' "${HOST_URL}$1" \
         -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json' \
         -d "$2")
     if [ -n "$response" ]; then
@@ -261,6 +300,12 @@ api_demo() {
     assert_root_api "GET" "/redoc" "200" "ReDoc OK" "Redocs unreachable"
     prompt_next
 
+    log_warn "AUTHENTICATION: Enforcing API Key Requirement..."
+    log_data "GET /companies/ (List all companies) - No API Key"
+    _demo_get_no_auth "companies"
+    log_data "GET /companies/ (List all companies) - Bad API Key"
+    _demo_get_bad_auth "companies"
+
     log_info "Step 1: CREATE (C) - Ingesting Corporate Entities"
     log_data "POST /companies/ (TESCO PLC)"
 
@@ -268,6 +313,7 @@ api_demo() {
     local tesco_res
     tesco_res=$(curl -sL -X 'POST' "${HOST_URL}companies" \
         -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json' \
         -d '{"company_number": "00445790"}')
 
@@ -319,6 +365,7 @@ api_demo() {
     local sim_res
     sim_res=$(curl -sL -X 'POST' "${HOST_URL}companies/$COMPANY_ID/simulate-loan" \
         -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json' \
         -d '{"loan_amount": 2500000, "term_months": 60}')
 

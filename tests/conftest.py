@@ -2,6 +2,7 @@
 import asyncio
 import json
 import pathlib
+from app.core.config import settings
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -131,8 +132,12 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
     # 2. Define the ASGI Transport
     transport = ASGITransport(app=app)
 
-    # 3. Initialize Client
-    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+   # 3. Initialize Client with API Key header
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://testserver",
+        headers={"X-API-Key": settings.API_KEY}
+    ) as ac:
         yield ac
 
     # 4. Cleanup

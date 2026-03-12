@@ -47,8 +47,9 @@ from app.services.company_service import CompanyService
 from app.services.environmental_metric_service import EnvironmentalMetricService
 from app.services.loan_simulation_service import LoanSimulationService
 from app.services.pdf_service import PDFService
+from app.api.dependencies.auth import verify_api_key
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_api_key)])
 
 # Type aliases for clean dependency injection across route signatures
 DbSession = Annotated[AsyncSession, Depends(get_db)]

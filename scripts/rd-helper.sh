@@ -30,12 +30,17 @@ _redis_ping() {
 }
 
 _api_post() {
-    curl -s -o /dev/null -w "%{http_code}" -X 'POST' "${ROOT_URL}$1" \
-        -H 'Content-Type: application/json' -H 'accept: application/json' -d "$2"
+    curl -s -o /dev/null -w "%{http_code}" \
+        -X 'POST' "${ROOT_URL}$1" \
+        -H 'Content-Type: application/json' \
+        -H "X-API-Key: ${API_KEY}" \
+        -H 'accept: application/json' -d "$2"
 }
 
 _api_delete() {
-    curl -s -o /dev/null -w "%{http_code}" -X 'DELETE' "${ROOT_URL}$1" \
+    curl -s -o /dev/null -w "%{http_code}" \
+        -X 'DELETE' "${ROOT_URL}$1" \
+        -H "X-API-Key: ${API_KEY}" \
         -H 'accept: application/json'
 }
 
