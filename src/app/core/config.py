@@ -28,6 +28,7 @@ class Settings(BaseSettings):  # type: ignore[misc]
     PROJECT_NAME: str = "Green FinTech BaaS Simulator"
     VERSION: str = "1.3.0"
     API_V1_STR: str = "/api/v1"
+    API_KEY: str
     ENVIRONMENT: str = Field("development", validation_alias="ENVIRONMENT")
 
     # DB Settings (Required from .env)

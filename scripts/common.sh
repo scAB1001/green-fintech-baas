@@ -91,6 +91,7 @@ load_env() {
         export POSTGRES_INITDB_ARGS="--auth=scram-sha-256"
         export REDIS_PASSWORD=dev_password
         export REDIS_PORT=6379
+        export API_KEY=sk_test_greenfintech_123456
         # export API_PORT=8080
     fi
     export DATABASE_URL="postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}"

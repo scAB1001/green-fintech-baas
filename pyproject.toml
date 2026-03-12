@@ -93,6 +93,7 @@ markers = [
     "integration: Integration tests (require Docker/database)",
     "crud: CRUD operation tests",
     "api: API endpoint tests",
+    "auth: Authentication tests",
     "slow: Tests that take > 5 seconds",
     "smoke: Quick smoke tests for CI",
 ]
