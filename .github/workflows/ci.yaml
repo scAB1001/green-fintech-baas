@@ -50,7 +50,7 @@ jobs:
       - name: Run Tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-        run: uv run pytest --cov --cov-branch --cov-report=xml --junitxml=pytest-results.xml | tee pytest-output.txt
+        run: uv run pytest --cov=. --cov-report=xml:coverage.xml --junitxml=pytest-results.xml | tee pytest-output.txt
 
       - name: Upload Test Results Artifact
         if: always() # Ensures we get the logs even if a test fails!
