@@ -9,6 +9,8 @@ Released on 2026-03-13.
 ### 🐛 Bug Fixes
 
 ### 🧹 Chores & Other Changes
+- Update Documentation
+- release v1.3.0 (#25)
 - Add Dependabot configuration for updates
 
 ### 👥 Contributors
