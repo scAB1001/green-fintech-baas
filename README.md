@@ -15,8 +15,8 @@ An elite, asynchronous REST API designed to bridge the gap between corporate fin
 
 As per the COMP3011 coursework requirements, all formal academic justifications and comprehensive technical manuals are located within this repository:
 
-* **📄 [Technical Report (PDF)](https://www.google.com/search?q=./Technical_Report.pdf):** Academic justification of the tech stack, architectural design choices, GenAI usage logs, and evaluation of limitations.
-* **📄 [API Documentation (PDF)](https://www.google.com/search?q=./API_Documentation.pdf):** The formal OpenAPI specification, documenting all endpoints, parameters, request/response JSON payloads, and error codes.
+* **📄 Technical Report (PDF):** Academic justification of the tech stack, architectural design choices, GenAI usage logs, and evaluation of limitations.
+* **📄 API Documentation (PDF):** The formal OpenAPI specification, documenting all endpoints, parameters, request/response JSON payloads, and error codes.
 * **📘 [Developer Wiki](https://www.google.com/search?q=https://github.com/scAB1001/green-fintech-baas/wiki):** The operational manual containing the Development Setup Guide, CI/CD Automation Guide, Testing Strategy, and Agile Project Management records.
 
 ---
