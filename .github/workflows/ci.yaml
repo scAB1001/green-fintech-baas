@@ -47,8 +47,20 @@ jobs:
           uv add pytest-cov --group dev
 
       - name: Run Tests
-        shell: bash
         env:
+          # PG details
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+          POSTGRES_PORT: 5432
+          POSTGRES_INITDB_ARGS: "--auth=scram-sha-256"
+          
+          # App Security & Cache Config
+          API_KEY: sk_test_greenfintech_123456
+          REDIS_PASSWORD: dev_password
+          REDIS_PORT: 6379
+          
+          # SQLAlchemy connection string
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
         run: |
           set -o pipefail
