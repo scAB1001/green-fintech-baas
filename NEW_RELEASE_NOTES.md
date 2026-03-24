@@ -1,14 +1,18 @@
 ## Release Notes
 
 ---
-Released on 2026-03-13.
+Released on 2026-03-24.
 
 ### 🚀 Features
 - Production ready release (#10)
 
 ### 🐛 Bug Fixes
+- Update ci.yaml to fail on error and use codecov token (#37)
 
 ### 🧹 Chores & Other Changes
+- Add second code cov upload for analytics (#41)
+- Update Documentation
+- release v1.3.0 (#27)
 - Update Documentation
 - release v1.3.0 (#25)
 - Add Dependabot configuration for updates
