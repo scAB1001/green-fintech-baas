@@ -45,7 +45,7 @@ repos:
         description: This hook checks for the existence of private keys.
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.7
     hooks:
       - id: ruff
         name: Ruff Python Linting
