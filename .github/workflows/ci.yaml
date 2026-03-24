@@ -14,7 +14,6 @@ env:
 
 jobs:
   lint-and-test:
-    if: github.actor != 'dependabot[bot]'
     name: Run Pytest & Coverage
     runs-on: ubuntu-latest
     services:
@@ -43,9 +42,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          uv lock
-          uv sync --all-groups
+        run: uv sync --frozen --all-groups
 
       - name: Run Tests
         env:
@@ -66,13 +63,10 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
-          fail_ci_if_error: false
-          flags: unittests
           token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
+          fail_ci_if_error: false
 
   docker-dry-run:
-    if: github.actor != 'dependabot[bot]'
     name: Verify Docker Build
     needs: lint-and-test
     runs-on: ubuntu-latest
@@ -104,7 +98,7 @@ jobs:
 
   merge-results:
     name: Consolidate CI Artifacts
-    if: always() # Run even if previous jobs skipped/failed to get a consolidated report
+    if: success()
     needs: [lint-and-test, docker-dry-run]
     runs-on: ubuntu-latest
     steps:
