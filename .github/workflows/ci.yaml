@@ -42,10 +42,20 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --frozen --all-groups
+        run: |
+          uv sync --frozen --all-groups
+          uv add pytest-cov --group dev
 
       - name: Run Tests
         env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+          POSTGRES_PORT: 5432
+          POSTGRES_INITDB_ARGS: "--auth=scram-sha-256"
+          API_KEY: sk_test_greenfintech_123456
+          REDIS_PASSWORD: dev_password
+          REDIS_PORT: 6379
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
         run: |
           set -o pipefail
@@ -56,7 +66,7 @@ jobs:
             | tee pytest-output.txt
 
       - name: Upload Test Results Artifact
-        if: always() # Ensures we get the logs even if a test fails!
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ci-result-tests
@@ -65,20 +75,12 @@ jobs:
             pytest-results.xml
             pytest-output.txt
 
-      # Upload Code Coverage (The lines hit)
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           files: ${{ github.workspace }}/coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
-
-      # Upload Test Results (The pass/fail analytics)
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   docker-dry-run:
     name: Verify Docker Build
@@ -95,7 +97,7 @@ jobs:
       uses: docker/build-push-action@v7
       with:
         context: .
-        push: false # Strictly verifies it builds without publishing
+        push: false
         tags: green-fintech-baas:test-build
         cache-from: type=gha
         cache-to: type=gha,mode=max
