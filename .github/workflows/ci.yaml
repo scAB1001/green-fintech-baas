@@ -61,7 +61,7 @@ jobs:
         run: |
           set -o pipefail
           uv run pytest --cov=src \
-            --cov-report=xml:${{ github.workspace }}/coverage.xml \
+            --cov-r eport=xml:${{ github.workspace }}/coverage.xml \
             --junitxml=${{ github.workspace }}/pytest-results.xml \
             -o junit_family=legacy \
             | tee pytest-output.txt
