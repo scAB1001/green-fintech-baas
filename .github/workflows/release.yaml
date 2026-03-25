@@ -49,14 +49,28 @@ jobs:
       run: uv python install 3.12
 
     - name: Install dependencies
-      run: |
-        uv lock
-        uv sync --all-groups
+        run: |
+          uv sync --frozen --all-groups
+          uv add pytest-cov --group dev
 
-    - name: Run tests
+    - name: Run Tests
       env:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: test_db
+        POSTGRES_PORT: 5432
+        POSTGRES_INITDB_ARGS: "--auth=scram-sha-256"
+        API_KEY: sk_test_greenfintech_123456
+        REDIS_PASSWORD: dev_password
+        REDIS_PORT: 6379
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-      run: uv run pytest --cov=. --cov-report=xml:coverage.xml --junitxml=pytest-results.xml | tee pytest-output.txt
+      run: |
+        set -o pipefail
+        uv run pytest --cov=src \
+          --cov-report=xml:${{ github.workspace }}/coverage.xml \
+          --junitxml=${{ github.workspace }}/pytest-results.xml \
+          -o junit_family=legacy \
+          | tee pytest-output.txt
 
     - name: Upload Test Results Artifact
       if: always()
@@ -71,11 +85,9 @@ jobs:
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
-        files: ./coverage.xml
-        fail_ci_if_error: false
-        flags: unittests
+        files: ${{ github.workspace }}/coverage.xml
         token: ${{ secrets.CODECOV_TOKEN }}
-        verbose: true
+        fail_ci_if_error: true
 
   create-release:
     needs: test
@@ -193,7 +205,6 @@ jobs:
           mv NEW_RELEASE_NOTES.md CHANGELOG.md
         fi
 
-    # THIS REPLACES THE MANUAL GIT PUSH LOGIC
     - name: Create Pull Request for Release
       if: steps.calculate-version.outputs.should_release == 'true'
       uses: peter-evans/create-pull-request@v8
