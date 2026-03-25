@@ -44,16 +44,30 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv lock
-          uv sync --all-groups
+          uv sync --frozen --all-groups
+          uv add pytest-cov --group dev
 
       - name: Run Tests
         env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+          POSTGRES_PORT: 5432
+          POSTGRES_INITDB_ARGS: "--auth=scram-sha-256"
+          API_KEY: sk_test_greenfintech_123456
+          REDIS_PASSWORD: dev_password
+          REDIS_PORT: 6379
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-        run: uv run pytest --cov=. --cov-report=xml:coverage.xml --junitxml=pytest-results.xml | tee pytest-output.txt
+        run: |
+          set -o pipefail
+          uv run pytest --cov=src \
+            --cov-report=xml:${{ github.workspace }}/coverage.xml \
+            --junitxml=${{ github.workspace }}/pytest-results.xml \
+            -o junit_family=legacy \
+            | tee pytest-output.txt
 
       - name: Upload Test Results Artifact
-        if: always() # Ensures we get the logs even if a test fails!
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ci-result-tests
@@ -65,11 +79,9 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
-          flags: unittests
+          files: ${{ github.workspace }}/coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
+          fail_ci_if_error: true
 
   docker-dry-run:
     if: github.actor != 'dependabot[bot]'
@@ -87,7 +99,7 @@ jobs:
       uses: docker/build-push-action@v7
       with:
         context: .
-        push: false # Strictly verifies it builds without publishing
+        push: false
         tags: green-fintech-baas:test-build
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -104,7 +116,7 @@ jobs:
 
   merge-results:
     name: Consolidate CI Artifacts
-    if: always() # Run even if previous jobs skipped/failed to get a consolidated report
+    if: success()
     needs: [lint-and-test, docker-dry-run]
     runs-on: ubuntu-latest
     steps:
