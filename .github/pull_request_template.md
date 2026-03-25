@@ -41,7 +41,7 @@ Closes #
 - [ ] **Database:** Migrations (Alembic) were generated and tested for schema changes.
 
 **Documentation:**
-- [ ] **API Specs:** ydantic schemas and FastAPI docstrings reflect these changes.
+- [ ] **API Specs:** Pydantic schemas and FastAPI docstrings reflect these changes.
 - [ ] **Wiki:** Relevant GitHub Wiki pages have been updated.
 
 ---
