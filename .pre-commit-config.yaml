@@ -108,7 +108,7 @@ repos:
           - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"
 
   - repo: https://github.com/GitGuardian/ggshield
-    rev: v1.48.0
+    rev: v1.49.0
     hooks:
       - id: ggshield
         name: ggshield (pre-commit)
